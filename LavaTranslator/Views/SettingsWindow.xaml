@@ -1,0 +1,96 @@
+<Window x:Class="LavaTranslator.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="设置 - 熔岩翻译助手"
+        Icon="pack://application:,,,/icon.ico"
+        Height="560" Width="720"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanMinimize">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TabControl Grid.Row="0">
+            <TabItem Header="百度翻译">
+                <StackPanel Margin="12">
+                    <GroupBox Header="API 密钥" Padding="12" Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="App ID" Margin="0,0,0,4"/>
+                            <TextBox x:Name="BaiduAppIdBox" Margin="0,0,0,12"/>
+                            <TextBlock Text="密钥 (Secret Key)" Margin="0,0,0,4"/>
+                            <PasswordBox x:Name="BaiduSecretBox"/>
+                            <TextBlock Margin="0,8,0,0" Foreground="Gray" FontSize="11"
+                                       TextWrapping="Wrap"
+                                       Text="在 https://fanyi-api.baidu.com/ 注册通用翻译 API 并获取 App ID 与密钥"/>
+                        </StackPanel>
+                    </GroupBox>
+                </StackPanel>
+            </TabItem>
+
+            <TabItem Header="AI 翻译 (OpenAI 协议)">
+                <DockPanel Margin="8">
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                        <Button Content="添加" Click="OnAddProvider" Padding="12,4" Margin="0,0,8,0"/>
+                        <Button Content="删除" Click="OnRemoveProvider" Padding="12,4" Margin="0,0,8,0"/>
+                        <Button Content="复制" Click="OnDuplicateProvider" Padding="12,4"/>
+                    </StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="180"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <ListBox x:Name="ProvidersList" Grid.Column="0"
+                                 DisplayMemberPath="Name"
+                                 SelectionChanged="OnProviderSelectionChanged"
+                                 Margin="0,0,8,0"/>
+                        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+                            <StackPanel x:Name="ProviderEditor" IsEnabled="False">
+                                <CheckBox x:Name="ProviderEnabledBox" Content="启用此配置（勾选后才会出现在「翻译引擎」菜单）"
+                                          IsChecked="True" Margin="0,0,0,12"/>
+                                <TextBlock Text="显示名称"/>
+                                <TextBox x:Name="ProviderNameBox" Margin="0,4,0,12"/>
+                                <TextBlock Text="API Key"/>
+                                <PasswordBox x:Name="ProviderApiKeyBox" Margin="0,4,0,12"/>
+                                <TextBlock Text="Base URL"/>
+                                <TextBox x:Name="ProviderBaseUrlBox" Margin="0,4,0,12"/>
+                                <TextBlock Text="模型"/>
+                                <TextBox x:Name="ProviderModelBox" Margin="0,4,0,12"/>
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                        <TextBlock Text="Temperature"/>
+                                        <TextBox x:Name="ProviderTemperatureBox" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="Max Tokens"/>
+                                        <TextBox x:Name="ProviderMaxTokensBox" Margin="0,4,0,0"/>
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock Foreground="Gray" FontSize="11" TextWrapping="Wrap"
+                                           Text="支持 OpenAI 兼容接口：OpenAI、DeepSeek、智谱 GLM、Ollama 等。Base URL 填完整端点根路径（如 …/v4/），仅填域名时程序会自动补 /v1/。"/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+                </DockPanel>
+            </TabItem>
+
+            <TabItem Header="通用">
+                <StackPanel Margin="12">
+                    <CheckBox x:Name="RunAtStartupBox" Content="开机时自动启动（登录后静默到系统托盘）" Margin="0,0,0,8"/>
+                    <CheckBox x:Name="RememberTranslatorBox" Content="记住上次使用的翻译引擎" Margin="0,0,0,8"/>
+                    <TextBlock Foreground="Gray" FontSize="11" Text="全局快捷键: Alt+Space（显示/隐藏窗口）"/>
+                </StackPanel>
+            </TabItem>
+        </TabControl>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button Content="保存" Click="OnSave" IsDefault="True" Padding="20,6" Margin="0,0,8,0"/>
+            <Button Content="取消" Click="OnCancel" IsCancel="True" Padding="20,6"/>
+        </StackPanel>
+    </Grid>
+</Window>

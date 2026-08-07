@@ -1,0 +1,85 @@
+﻿<Window x:Class="LavaTranslator.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="熔岩翻译助手"
+        Height="700" Width="1200"
+        MinHeight="500" MinWidth="900"
+        Icon="pack://application:,,,/icon.ico"
+        WindowStartupLocation="CenterScreen">
+    <DockPanel>
+        <Menu DockPanel.Dock="Top">
+            <MenuItem x:Name="TranslatorEngineMenu" Header="翻译引擎(_T)">
+                <MenuItem x:Name="BaiduMenuItem" Header="百度翻译(_B)" IsCheckable="True" IsChecked="True"
+                          Click="OnTranslatorMenuClick" Tag="百度翻译"/>
+            </MenuItem>
+            <MenuItem Header="设置(_S)">
+                <MenuItem Header="翻译设置(_S)" Click="OnOpenSettings"/>
+            </MenuItem>
+            <MenuItem Header="帮助(_H)">
+                <MenuItem Header="关于(_A)" Click="OnAbout"/>
+            </MenuItem>
+        </Menu>
+
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <TextBlock x:Name="EngineLabel" Text="引擎: 百度翻译" Margin="0,0,16,0"/>
+            </StatusBarItem>
+            <StatusBarItem>
+                <TextBlock x:Name="StatusText" Text="Alt+Space | 准备就绪"/>
+            </StatusBarItem>
+        </StatusBar>
+
+        <Grid Margin="20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                <TextBlock Text="原文语言" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <ComboBox x:Name="SourceLanguageCombo" Width="140" DisplayMemberPath="DisplayName"
+                          SelectedValuePath="Code" VerticalAlignment="Center"/>
+                <Button Content="⇄" ToolTip="交换原文与目标语言" Click="OnSwapLanguages"
+                        Padding="10,4" Margin="12,0" FontSize="14"/>
+                <TextBlock Text="目标语言" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <ComboBox x:Name="TargetLanguageCombo" Width="140" DisplayMemberPath="DisplayName"
+                          SelectedValuePath="Code" VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <GroupBox Header="原文" Grid.Column="0" Margin="0,0,10,0" Padding="12">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Bottom" Foreground="Gray" FontSize="11" Margin="0,8,0,0"
+                                   Text="Ctrl+Enter 快速翻译"/>
+                        <TextBox x:Name="InputText" AcceptsReturn="True" TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto"
+                                 FontSize="14" Padding="8"/>
+                    </DockPanel>
+                </GroupBox>
+
+                <GroupBox Header="译文" Grid.Column="1" Margin="10,0,0,0" Padding="12">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Bottom" Foreground="Gray" FontSize="11" Margin="0,8,0,0"
+                                   Text="使用「复制」按钮复制结果"/>
+                        <TextBox x:Name="OutputText" AcceptsReturn="True" TextWrapping="Wrap"
+                                 VerticalScrollBarVisibility="Auto" IsReadOnly="True"
+                                 FontSize="14" Padding="8"/>
+                    </DockPanel>
+                </GroupBox>
+            </Grid>
+
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                <Button Content="清空" Click="OnClear" Padding="16,8" Margin="0,0,8,0"/>
+                <Button Content="复制" Click="OnCopy" Padding="16,8" Margin="0,0,8,0"/>
+                <Button Content="交换" Click="OnSwap" Padding="16,8" Margin="0,0,8,0"/>
+                <Button x:Name="TranslateButton" Content="翻译" Click="OnTranslate" Padding="24,8" FontWeight="SemiBold"/>
+            </StackPanel>
+        </Grid>
+    </DockPanel>
+</Window>
