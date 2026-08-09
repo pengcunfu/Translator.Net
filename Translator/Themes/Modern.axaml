@@ -28,4 +28,14 @@
   <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}"/>
   <SolidColorBrush x:Key="AccentTextBrush" Color="White"/>
 
+  <!-- 覆盖 Fluent 默认 Tab 尺寸（默认字号 24 / 高度 48 / 左右 12，间距过大） -->
+  <x:Double x:Key="TabItemHeaderFontSize">13</x:Double>
+  <Thickness x:Key="TabItemHeaderMargin">6,0,6,0</Thickness>
+  <x:Double x:Key="TabItemMinHeight">30</x:Double>
+  <FontWeight x:Key="TabItemHeaderThemeFontWeight">Normal</FontWeight>
+
+  <!-- 滚动条宽度/高度：Fluent 默认 16 -->
+  <x:Double x:Key="ScrollBarSize">5</x:Double>
+  <x:Double x:Key="ScrollBarButtonArrowIconFontSize">5</x:Double>
+
 </ResourceDictionary>

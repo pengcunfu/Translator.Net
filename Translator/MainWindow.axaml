@@ -17,29 +17,71 @@
       </StackPanel>
     </Border>
 
-    <TabControl x:Name="MainTabs" Margin="12" SelectionChanged="OnMainTabChanged">
-      <TabItem Header="翻译">
-        <Grid Margin="0,12,0,0" RowDefinitions="Auto,*,Auto">
-          <Border Grid.Row="0" Classes="panel" Padding="10,8" Margin="0,0,0,10">
-            <DockPanel LastChildFill="False">
-              <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="0">
-                <TextBlock Text="原文" Classes="field" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                <ComboBox x:Name="SourceLanguageCombo" Width="128"
-                          DisplayMemberBinding="{Binding DisplayName}"
-                          VerticalAlignment="Center"/>
-                <Button Content="⇄" ToolTip.Tip="交换原文与目标语言" Click="OnSwapLanguages"
-                        Classes="icon" Margin="8,0"/>
-                <TextBlock Text="译文" Classes="field" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                <ComboBox x:Name="TargetLanguageCombo" Width="128"
-                          DisplayMemberBinding="{Binding DisplayName}"
-                          VerticalAlignment="Center"/>
-              </StackPanel>
-              <TextBlock DockPanel.Dock="Right" Classes="muted"
-                         Text="Ctrl+Enter 翻译" VerticalAlignment="Center"/>
-            </DockPanel>
-          </Border>
+    <Grid Margin="12,8,12,12" RowDefinitions="Auto,*">
+      <!-- 顶栏：左 Tab + 右快捷操作 -->
+      <Border Grid.Row="0" Classes="panel" Padding="8,4" Margin="0,0,0,10">
+        <DockPanel LastChildFill="False">
+          <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center"
+                      DockPanel.Dock="Left">
+            <Button x:Name="TabWebButton" Content="网页" Classes="nav-tab selected"
+                    Tag="0" Click="OnNavTabClick"/>
+            <Button x:Name="TabTranslateButton" Content="翻译" Classes="nav-tab"
+                    Tag="1" Click="OnNavTabClick"/>
+            <Button x:Name="TabSettingsButton" Content="设置" Classes="nav-tab"
+                    Tag="2" Click="OnNavTabClick"/>
+            <Button x:Name="TabAboutButton" Content="关于" Classes="nav-tab"
+                    Tag="3" Click="OnNavTabClick"/>
+          </StackPanel>
 
-          <Grid Grid.Row="1" ColumnDefinitions="*,10,*">
+          <!-- 网页快捷操作 -->
+          <StackPanel x:Name="WebToolbar" Orientation="Horizontal" Spacing="6"
+                      VerticalAlignment="Center" DockPanel.Dock="Right">
+            <ComboBox x:Name="WebSiteCombo" Width="120"
+                      DisplayMemberBinding="{Binding Name}"
+                      SelectionChanged="OnWebSiteSelectionChanged"/>
+            <Button Content="←" ToolTip.Tip="后退" Classes="icon" Click="OnWebBack"/>
+            <Button Content="→" ToolTip.Tip="前进" Classes="icon" Click="OnWebForward"/>
+            <Button Content="↻" ToolTip.Tip="刷新" Classes="icon" Click="OnWebReload"/>
+            <Button Content="首页" ToolTip.Tip="打开当前网站首页" Classes="secondary" Click="OnWebHome"/>
+            <Button Content="用原文打开" ToolTip.Tip="把翻译页原文发送到当前网站（支持的站点会填入文本）"
+                    Classes="secondary" Click="OnWebOpenWithInput"/>
+            <TextBox x:Name="WebUrlBox" Width="200" IsReadOnly="True"
+                     VerticalAlignment="Center" Classes="muted"/>
+          </StackPanel>
+
+          <!-- 翻译快捷操作 -->
+          <StackPanel x:Name="TranslateToolbar" Orientation="Horizontal" Spacing="6"
+                      VerticalAlignment="Center" DockPanel.Dock="Right" IsVisible="False">
+            <TextBlock Text="引擎" Classes="field" Margin="0" VerticalAlignment="Center"/>
+            <ComboBox x:Name="EngineCombo" Width="140"
+                      SelectionChanged="OnEngineSelectionChanged"
+                      ToolTip.Tip="在「设置」中配置 API 后，启用的引擎会出现在此列表"/>
+            <TextBlock Text="原文" Classes="field" Margin="8,0,0,0" VerticalAlignment="Center"/>
+            <ComboBox x:Name="SourceLanguageCombo" Width="110"
+                      DisplayMemberBinding="{Binding DisplayName}"
+                      VerticalAlignment="Center"/>
+            <Button Content="⇄" ToolTip.Tip="交换原文与目标语言" Click="OnSwapLanguages"
+                    Classes="icon"/>
+            <TextBlock Text="译文" Classes="field" Margin="0" VerticalAlignment="Center"/>
+            <ComboBox x:Name="TargetLanguageCombo" Width="110"
+                      DisplayMemberBinding="{Binding DisplayName}"
+                      VerticalAlignment="Center"/>
+            <TextBlock Classes="muted" Text="Ctrl+Enter" VerticalAlignment="Center" Margin="4,0,0,0"/>
+          </StackPanel>
+        </DockPanel>
+      </Border>
+
+      <!-- 内容区 -->
+      <Panel Grid.Row="1">
+        <!-- 网页 -->
+        <Border x:Name="WebPage" Classes="panel" Padding="0" ClipToBounds="True">
+          <NativeWebView x:Name="WebView"
+                         NavigationCompleted="OnWebNavigationCompleted"/>
+        </Border>
+
+        <!-- 翻译 -->
+        <Grid x:Name="TranslatePage" IsVisible="False" RowDefinitions="*,Auto">
+          <Grid Grid.Row="0" ColumnDefinitions="*,10,*">
             <Border Grid.Column="0" Classes="panel" Padding="0">
               <DockPanel>
                 <Border DockPanel.Dock="Top"
@@ -71,60 +113,20 @@
             </Border>
           </Grid>
 
-          <DockPanel Grid.Row="2" Margin="0,10,0,0" LastChildFill="False">
+          <DockPanel Grid.Row="1" Margin="0,10,0,0" LastChildFill="False">
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" Spacing="4">
               <Button Content="清空" Click="OnClear" Classes="ghost"/>
               <Button Content="复制" Click="OnCopy" Classes="secondary"/>
               <Button Content="交换" Click="OnSwap" Classes="secondary" Margin="0,0,4,0"/>
               <Button x:Name="TranslateButton" Content="翻译" Click="OnTranslate"
-                      Classes="primary" IsDefault="True"/>
+                      Classes="primary" IsDefault="False"/>
             </StackPanel>
           </DockPanel>
         </Grid>
-      </TabItem>
 
-      <TabItem Header="网页">
-        <Grid Margin="0,12,0,0" RowDefinitions="Auto,*">
-          <Border Grid.Row="0" Classes="panel" Padding="8,6" Margin="0,0,0,10">
-            <DockPanel LastChildFill="True">
-              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
-                          DockPanel.Dock="Left">
-                <TextBlock Text="网站" Classes="field" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                <ComboBox x:Name="WebSiteCombo" Width="140"
-                          DisplayMemberBinding="{Binding Name}"
-                          SelectionChanged="OnWebSiteSelectionChanged"/>
-                <Button Content="←" ToolTip.Tip="后退" Classes="icon" Click="OnWebBack"/>
-                <Button Content="→" ToolTip.Tip="前进" Classes="icon" Click="OnWebForward"/>
-                <Button Content="↻" ToolTip.Tip="刷新" Classes="icon" Click="OnWebReload"/>
-                <Button Content="首页" ToolTip.Tip="打开当前网站首页" Classes="secondary" Click="OnWebHome"/>
-                <Button Content="用原文打开" ToolTip.Tip="把翻译页原文发送到当前网站（支持的站点会填入文本）"
-                        Classes="secondary" Click="OnWebOpenWithInput"/>
-              </StackPanel>
-              <TextBox x:Name="WebUrlBox" Margin="10,0,0,0" IsReadOnly="True"
-                       VerticalAlignment="Center" Classes="muted"/>
-            </DockPanel>
-          </Border>
-
-          <Border Grid.Row="1" Classes="panel" Padding="0" ClipToBounds="True">
-            <NativeWebView x:Name="WebView"
-                           NavigationCompleted="OnWebNavigationCompleted"/>
-          </Border>
-        </Grid>
-      </TabItem>
-
-      <TabItem Header="设置">
-        <Grid Margin="0,12,0,0" RowDefinitions="Auto,*,Auto">
-          <Border Grid.Row="0" Classes="panel" Padding="10,8" Margin="0,0,0,10">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="8">
-              <TextBlock Text="翻译引擎" Classes="field" Margin="0" VerticalAlignment="Center"/>
-              <ComboBox x:Name="EngineCombo" Width="220"
-                        SelectionChanged="OnEngineSelectionChanged"/>
-              <TextBlock Classes="muted" VerticalAlignment="Center"
-                         Text="在下方配置 API 后，启用的引擎会出现在此列表"/>
-            </StackPanel>
-          </Border>
-
-          <TabControl Grid.Row="1">
+        <!-- 设置 -->
+        <Grid x:Name="SettingsPage" IsVisible="False" RowDefinitions="*,Auto">
+          <TabControl Grid.Row="0">
             <TabItem Header="百度翻译">
               <Border Classes="panel" Margin="0,10,0,0" Padding="14">
                 <StackPanel>
@@ -196,7 +198,7 @@
             </TabItem>
           </TabControl>
 
-          <Border Grid.Row="2"
+          <Border Grid.Row="1"
                   BorderBrush="{DynamicResource BorderBrushKey}"
                   BorderThickness="0,1,0,0"
                   Margin="0,12,0,0" Padding="0,12,0,0">
@@ -205,10 +207,9 @@
             </StackPanel>
           </Border>
         </Grid>
-      </TabItem>
 
-      <TabItem Header="关于">
-        <Border Classes="panel" Margin="0,12,0,0" Padding="24" VerticalAlignment="Top">
+        <!-- 关于 -->
+        <Border x:Name="AboutPage" Classes="panel" Padding="24" VerticalAlignment="Top" IsVisible="False">
           <StackPanel>
             <TextBlock Text="熔岩翻译助手" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,4"/>
             <TextBlock Text="v1.0.0" Classes="muted" Margin="0,0,0,16"/>
@@ -221,7 +222,7 @@
                        Text="关闭窗口后程序会继续在系统托盘运行"/>
           </StackPanel>
         </Border>
-      </TabItem>
-    </TabControl>
+      </Panel>
+    </Grid>
   </DockPanel>
 </Window>

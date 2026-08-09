@@ -103,8 +103,33 @@
 
   <Style Selector="TabItem">
     <Setter Property="FontSize" Value="12.5"/>
-    <Setter Property="Padding" Value="12,6"/>
-    <Setter Property="Margin" Value="0,0,8,0"/>
+    <Setter Property="Padding" Value="8,4"/>
+    <Setter Property="Margin" Value="0"/>
+    <Setter Property="MinWidth" Value="0"/>
+  </Style>
+
+  <!-- 主窗口顶栏导航 Tab 按钮 -->
+  <Style Selector="Button.nav-tab">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}"/>
+    <Setter Property="BorderThickness" Value="0,0,0,2"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="Padding" Value="8,4"/>
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="FontWeight" Value="Normal"/>
+    <Setter Property="MinWidth" Value="0"/>
+    <Setter Property="MinHeight" Value="28"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="CornerRadius" Value="0"/>
+  </Style>
+  <Style Selector="Button.nav-tab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+  </Style>
+  <Style Selector="Button.nav-tab.selected">
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
   </Style>
 
   <Style Selector="ComboBox">
@@ -119,6 +144,23 @@
 
   <Style Selector="ListBox">
     <Setter Property="FontSize" Value="12.5"/>
+  </Style>
+
+  <!-- Avalonia 组件滚动条：横向/纵向均为 5px -->
+  <Style Selector="ScrollBar:vertical">
+    <Setter Property="Width" Value="5"/>
+    <Setter Property="MinWidth" Value="5"/>
+  </Style>
+  <Style Selector="ScrollBar:horizontal">
+    <Setter Property="Height" Value="5"/>
+    <Setter Property="MinHeight" Value="5"/>
+  </Style>
+  <Style Selector="ScrollBar /template/ RepeatButton">
+    <Setter Property="IsVisible" Value="False"/>
+    <Setter Property="Width" Value="0"/>
+    <Setter Property="Height" Value="0"/>
+    <Setter Property="MinWidth" Value="0"/>
+    <Setter Property="MinHeight" Value="0"/>
   </Style>
 
 </Styles>

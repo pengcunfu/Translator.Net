@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     private bool _suppressWebSiteSync;
     private bool _forceClose;
     private bool _webInitialized;
+    private int _mainTabIndex;
 
     /// <summary>Design-time / XAML loader entry point.</summary>
     public MainWindow()
@@ -58,6 +59,15 @@ public partial class MainWindow : Window
         RestoreLastTranslator();
         RefreshEngineList();
         ApplyPlatformUi();
+
+        SelectMainTab(0);
+
+        // 默认「网页」：窗口打开后再加载站点（WebView2 就绪）
+        Opened += (_, _) =>
+        {
+            if (!_webInitialized)
+                NavigateSelectedWebSite(withInputText: false);
+        };
 
         InputText.KeyDown += (_, e) =>
         {
@@ -111,16 +121,40 @@ public partial class MainWindow : Window
             HotkeyHint.Text = "全局快捷键 Alt+Space 目前仅在 Windows 上可用。";
     }
 
-    private void OnMainTabChanged(object? sender, SelectionChangedEventArgs e)
+    private void OnNavTabClick(object? sender, RoutedEventArgs e)
     {
-        if (!ReferenceEquals(e.Source, MainTabs))
-            return;
+        if (sender is Button { Tag: string tag } && int.TryParse(tag, out var index))
+            SelectMainTab(index);
+        else if (sender is Button { Tag: int indexInt })
+            SelectMainTab(indexInt);
+    }
 
-        TranslateButton.IsDefault = MainTabs.SelectedIndex == 0;
+    private void SelectMainTab(int index)
+    {
+        _mainTabIndex = index;
 
-        // 首次进入「网页」再加载，避免启动时立刻拉起 WebView2
-        if (MainTabs.SelectedIndex == 1 && !_webInitialized)
+        WebPage.IsVisible = index == 0;
+        TranslatePage.IsVisible = index == 1;
+        SettingsPage.IsVisible = index == 2;
+        AboutPage.IsVisible = index == 3;
+
+        WebToolbar.IsVisible = index == 0;
+        TranslateToolbar.IsVisible = index == 1;
+
+        SetNavTabSelected(TabWebButton, index == 0);
+        SetNavTabSelected(TabTranslateButton, index == 1);
+        SetNavTabSelected(TabSettingsButton, index == 2);
+        SetNavTabSelected(TabAboutButton, index == 3);
+
+        TranslateButton.IsDefault = index == 1;
+
+        if (index == 0 && !_webInitialized)
             NavigateSelectedWebSite(withInputText: false);
+    }
+
+    private static void SetNavTabSelected(Button button, bool selected)
+    {
+        button.Classes.Set("selected", selected);
     }
 
     private void InitWebSites()
@@ -229,7 +263,7 @@ public partial class MainWindow : Window
             SetStatus($"{site.Name} 不支持链接传参，原文已复制，请在网页中粘贴", isWarning: true);
         }
 
-        MainTabs.SelectedIndex = 1;
+        SelectMainTab(0);
         NavigateSelectedWebSite(withInputText: true);
     }
 
@@ -239,7 +273,42 @@ public partial class MainWindow : Window
             WebUrlBox.Text = uri.ToString();
 
         if (!e.IsSuccess)
+        {
             SetStatus("网页加载失败，请检查网络或 WebView2 运行时", isError: true);
+            return;
+        }
+
+        _ = InjectThinScrollbarStyleAsync();
+    }
+
+    private async Task InjectThinScrollbarStyleAsync()
+    {
+        // WebView 内页滚动条由页面 CSS 控制，注入 5px 细滚动条
+        const string script = """
+            (function () {
+              const id = 'lava-thin-scrollbar';
+              if (document.getElementById(id)) return;
+              const style = document.createElement('style');
+              style.id = id;
+              style.textContent = `
+                html { scrollbar-width: thin; }
+                ::-webkit-scrollbar { width: 5px; height: 5px; }
+                ::-webkit-scrollbar-track { background: transparent; }
+                ::-webkit-scrollbar-thumb { background: rgba(0,0,0,.28); border-radius: 3px; }
+                ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,.42); }
+              `;
+              (document.head || document.documentElement).appendChild(style);
+            })();
+            """;
+
+        try
+        {
+            await WebView.InvokeScript(script);
+        }
+        catch
+        {
+            // 部分站点 CSP 可能阻止注入，忽略即可
+        }
     }
 
     private async Task CopyTextToClipboardAsync(string text)
@@ -625,7 +694,9 @@ public partial class MainWindow : Window
         }
 
         ShowAndActivate();
+        SelectMainTab(1);
         InputText.Text = text;
+        InputText.Focus();
         await TranslateAsync();
     }
 
@@ -634,8 +705,7 @@ public partial class MainWindow : Window
         Show();
         WindowState = WindowState.Normal;
         Activate();
-        MainTabs.SelectedIndex = 0;
-        InputText.Focus();
+        SelectMainTab(0);
     }
 
     public void ToggleWindow()
