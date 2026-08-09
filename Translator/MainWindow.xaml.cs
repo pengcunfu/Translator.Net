@@ -1,10 +1,11 @@
-﻿using System.Windows;
+﻿using System.Collections.ObjectModel;
+using System.Globalization;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using LavaTranslator.Infrastructure;
 using LavaTranslator.Models;
 using LavaTranslator.Services;
-using LavaTranslator.Views;
 
 namespace LavaTranslator;
 
@@ -14,9 +15,11 @@ public partial class MainWindow : Window
     private readonly TranslationService _translationService;
     private readonly TrayIconService _tray;
     private GlobalHotkey? _hotkey;
-    private readonly List<System.Windows.Controls.MenuItem> _aiMenuItems = [];
+    private readonly ObservableCollection<OpenAiProviderConfig> _providers = [];
     private string _currentTranslator = "百度翻译";
     private CancellationTokenSource? _translateCts;
+    private bool _suppressEngineSync;
+    private bool _suppressProviderSync;
 
     public MainWindow(
         ConfigService configService,
@@ -28,11 +31,12 @@ public partial class MainWindow : Window
         _translationService = translationService;
         _tray = tray;
 
-        _configService.ConfigChanged += (_, _) => RefreshTranslatorMenu();
+        _configService.ConfigChanged += (_, _) => Dispatcher.Invoke(RefreshEngineList);
 
         InitLanguageSelectors();
-        RefreshTranslatorMenu();
+        LoadSettingsFields();
         RestoreLastTranslator();
+        RefreshEngineList();
 
         InputText.PreviewKeyDown += (_, e) =>
         {
@@ -70,51 +74,12 @@ public partial class MainWindow : Window
             "程序已启动\n• 双击托盘图标打开窗口\n• Alt+Space 显示/隐藏\n• 右键托盘查看更多功能");
     }
 
-    private void RefreshTranslatorMenu()
+    private void OnMainTabChanged(object sender, SelectionChangedEventArgs e)
     {
-        var translators = _translationService.AvailableTranslators;
+        if (!ReferenceEquals(e.Source, MainTabs))
+            return;
 
-        while (TranslatorEngineMenu.Items.Count > 1)
-            TranslatorEngineMenu.Items.RemoveAt(1);
-        _aiMenuItems.Clear();
-
-        var aiNames = translators.Where(n => n != "百度翻译").ToList();
-        if (aiNames.Count == 0)
-        {
-            var hint = new System.Windows.Controls.MenuItem
-            {
-                Header = "（未启用 AI：设置中勾选「启用此配置」并填写 API Key）",
-                IsEnabled = false
-            };
-            TranslatorEngineMenu.Items.Add(hint);
-            _aiMenuItems.Add(hint);
-        }
-        else
-        {
-            TranslatorEngineMenu.Items.Add(new Separator());
-            foreach (var name in aiNames)
-            {
-                var item = new System.Windows.Controls.MenuItem
-                {
-                    Header = name,
-                    IsCheckable = true,
-                    Tag = name
-                };
-                item.Click += OnTranslatorMenuClick;
-                TranslatorEngineMenu.Items.Add(item);
-                _aiMenuItems.Add(item);
-            }
-        }
-
-        if (!translators.Contains(_currentTranslator))
-        {
-            _currentTranslator = translators.FirstOrDefault() ?? "百度翻译";
-            SetCheckedTranslator(_currentTranslator);
-        }
-        else
-        {
-            SetCheckedTranslator(_currentTranslator);
-        }
+        TranslateButton.IsDefault = MainTabs.SelectedIndex == 0;
     }
 
     private void InitLanguageSelectors()
@@ -129,6 +94,23 @@ public partial class MainWindow : Window
         SourceLanguageCombo.SelectionChanged += (_, _) => SaveLanguagePreferences();
         TargetLanguageCombo.SelectionChanged += (_, _) => SaveLanguagePreferences();
         UpdateLanguageStatus();
+    }
+
+    private void LoadSettingsFields()
+    {
+        var config = _configService.Current;
+        BaiduAppIdBox.Text = config.Baidu.AppId;
+        BaiduSecretBox.Password = config.Baidu.SecretKey;
+        RunAtStartupBox.IsChecked = config.General.RunAtStartup;
+        RememberTranslatorBox.IsChecked = config.General.RememberLastTranslator;
+
+        _providers.Clear();
+        foreach (var p in config.OpenAiProviders)
+            _providers.Add(CloneProvider(p));
+
+        ProvidersList.ItemsSource = _providers;
+        if (_providers.Count > 0)
+            ProvidersList.SelectedIndex = 0;
     }
 
     private static void SelectLanguage(System.Windows.Controls.ComboBox combo, string code, string fallback)
@@ -157,8 +139,7 @@ public partial class MainWindow : Window
     {
         var from = LanguageCatalog.GetDisplayName(SourceLanguageCombo.SelectedValue as string ?? "auto");
         var to = LanguageCatalog.GetDisplayName(TargetLanguageCombo.SelectedValue as string ?? "en");
-        var engine = _currentTranslator;
-        EngineLabel.Text = $"引擎: {engine} | {from} → {to}";
+        EngineLabel.Text = $"引擎: {_currentTranslator} | {from} → {to}";
     }
 
     private void OnSwapLanguages(object sender, RoutedEventArgs e)
@@ -183,26 +164,45 @@ public partial class MainWindow : Window
         var general = _configService.Current.General;
         if (general.RememberLastTranslator && !string.IsNullOrWhiteSpace(general.LastTranslator))
             _currentTranslator = general.LastTranslator;
-
-        SetCheckedTranslator(_currentTranslator);
     }
 
-    private void SetCheckedTranslator(string name)
+    private void RefreshEngineList()
     {
-        _currentTranslator = name;
-        BaiduMenuItem.IsChecked = name == "百度翻译";
-        foreach (var item in _aiMenuItems)
-        {
-            if (item.Tag is string tag)
-                item.IsChecked = tag == name;
-        }
+        var translators = _translationService.AvailableTranslators.ToList();
+        if (translators.Count == 0)
+            translators.Add("百度翻译");
+
+        if (!translators.Contains(_currentTranslator))
+            _currentTranslator = translators[0];
+
+        _suppressEngineSync = true;
+        EngineCombo.ItemsSource = translators;
+        EngineCombo.SelectedItem = _currentTranslator;
+        _suppressEngineSync = false;
+
         UpdateLanguageStatus();
     }
 
-    private void OnTranslatorMenuClick(object sender, RoutedEventArgs e)
+    private void SetCurrentTranslator(string name)
     {
-        if (sender is System.Windows.Controls.MenuItem { Tag: string name })
-            SetCheckedTranslator(name);
+        _currentTranslator = name;
+        _suppressEngineSync = true;
+        if (EngineCombo.Items.Contains(name))
+            EngineCombo.SelectedItem = name;
+        _suppressEngineSync = false;
+        UpdateLanguageStatus();
+    }
+
+    private void OnEngineSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressEngineSync)
+            return;
+
+        if (EngineCombo.SelectedItem is string name)
+        {
+            _currentTranslator = name;
+            UpdateLanguageStatus();
+        }
     }
 
     private async void OnTranslate(object sender, RoutedEventArgs e) => await TranslateAsync();
@@ -301,38 +301,143 @@ public partial class MainWindow : Window
         SetStatus("内容与语言方向已交换");
     }
 
-    private void OnOpenSettings(object sender, RoutedEventArgs e)
+    private void OnAddProvider(object sender, RoutedEventArgs e)
     {
-        var dialog = new SettingsWindow(_configService, this);
-        if (dialog.ShowDialog() == true)
+        var provider = new OpenAiProviderConfig
         {
-            RefreshTranslatorMenu();
-            var aiEngines = _translationService.AvailableTranslators
-                .Where(n => n != "百度翻译").ToList();
-            if (aiEngines.Count > 0 && _currentTranslator == "百度翻译")
-            {
-                // 刚配置好 AI 时自动切换到第一个可用引擎
-                var last = _configService.Current.General.LastTranslator;
-                if (string.IsNullOrWhiteSpace(last) || last == "百度翻译" || !aiEngines.Contains(last))
-                    SetCheckedTranslator(aiEngines[0]);
-                else
-                    SetCheckedTranslator(last);
-            }
-            SetStatus("设置已保存");
-        }
+            Name = $"AI翻译 {_providers.Count + 1}",
+            BaseUrl = "https://api.openai.com/v1/",
+            Model = "gpt-4o-mini",
+            Enabled = true
+        };
+        _providers.Add(provider);
+        ProvidersList.SelectedItem = provider;
     }
 
-    private void OnAbout(object sender, RoutedEventArgs e)
+    private void OnRemoveProvider(object sender, RoutedEventArgs e)
     {
-        MessageBox.Show(this,
-            "熔岩翻译助手 v1.0.0\n\n" +
-            "基于 .NET 10 WPF\n" +
-            "支持百度翻译 API 与 OpenAI 兼容 AI 翻译\n\n" +
-            "快捷键: Alt+Space",
-            "关于",
-            MessageBoxButton.OK,
-            MessageBoxImage.Information);
+        if (ProvidersList.SelectedItem is not OpenAiProviderConfig selected)
+            return;
+
+        _providers.Remove(selected);
+        ProviderEditor.IsEnabled = _providers.Count > 0;
+        if (_providers.Count > 0)
+            ProvidersList.SelectedIndex = 0;
     }
+
+    private void OnDuplicateProvider(object sender, RoutedEventArgs e)
+    {
+        if (ProvidersList.SelectedItem is not OpenAiProviderConfig selected)
+            return;
+
+        SaveEditorToProvider(selected);
+        var copy = CloneProvider(selected);
+        copy.Id = Guid.NewGuid().ToString("N");
+        copy.Name = selected.Name + " (副本)";
+        _providers.Add(copy);
+        ProvidersList.SelectedItem = copy;
+    }
+
+    private void OnProviderSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressProviderSync)
+            return;
+
+        if (e.RemovedItems.Count > 0 && e.RemovedItems[0] is OpenAiProviderConfig oldProvider)
+            SaveEditorToProvider(oldProvider);
+
+        if (ProvidersList.SelectedItem is OpenAiProviderConfig provider)
+            LoadProviderToEditor(provider);
+
+        ProviderEditor.IsEnabled = ProvidersList.SelectedItem is not null;
+    }
+
+    private void LoadProviderToEditor(OpenAiProviderConfig provider)
+    {
+        _suppressProviderSync = true;
+        ProviderEnabledBox.IsChecked = provider.Enabled;
+        ProviderNameBox.Text = provider.Name;
+        ProviderApiKeyBox.Password = provider.ApiKey;
+        ProviderBaseUrlBox.Text = provider.BaseUrl;
+        ProviderModelBox.Text = provider.Model;
+        ProviderTemperatureBox.Text = provider.Temperature.ToString(CultureInfo.InvariantCulture);
+        ProviderMaxTokensBox.Text = provider.MaxTokens.ToString();
+        _suppressProviderSync = false;
+    }
+
+    private void SaveEditorToProvider(OpenAiProviderConfig provider)
+    {
+        provider.Name = ProviderNameBox.Text.Trim();
+        provider.ApiKey = ProviderApiKeyBox.Password;
+        provider.Enabled = ProviderEnabledBox.IsChecked == true
+            || !string.IsNullOrWhiteSpace(provider.ApiKey);
+        provider.BaseUrl = ProviderBaseUrlBox.Text.Trim();
+        provider.Model = ProviderModelBox.Text.Trim();
+
+        if (double.TryParse(ProviderTemperatureBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var temp))
+            provider.Temperature = Math.Clamp(temp, 0, 2);
+
+        if (int.TryParse(ProviderMaxTokensBox.Text, out var maxTokens))
+            provider.MaxTokens = Math.Clamp(maxTokens, 100, 128000);
+    }
+
+    private void OnSaveSettings(object sender, RoutedEventArgs e)
+    {
+        if (ProvidersList.SelectedItem is OpenAiProviderConfig selected)
+            SaveEditorToProvider(selected);
+
+        var config = _configService.Current;
+        config.Baidu = new BaiduConfig
+        {
+            AppId = BaiduAppIdBox.Text.Trim(),
+            SecretKey = BaiduSecretBox.Password
+        };
+        config.OpenAiProviders = _providers.Select(CloneProvider).ToList();
+        config.General.RunAtStartup = RunAtStartupBox.IsChecked == true;
+        config.General.RememberLastTranslator = RememberTranslatorBox.IsChecked == true;
+
+        if (!_configService.Save(config))
+        {
+            MessageBox.Show(this, "保存配置失败", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        if (!StartupService.SetEnabled(config.General.RunAtStartup))
+        {
+            MessageBox.Show(this,
+                "配置已保存，但无法更新开机自启动设置。请检查是否有权限修改注册表。",
+                "警告",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+
+        RefreshEngineList();
+
+        var aiEngines = _translationService.AvailableTranslators
+            .Where(n => n != "百度翻译").ToList();
+        if (aiEngines.Count > 0 && _currentTranslator == "百度翻译")
+        {
+            var last = _configService.Current.General.LastTranslator;
+            if (string.IsNullOrWhiteSpace(last) || last == "百度翻译" || !aiEngines.Contains(last))
+                SetCurrentTranslator(aiEngines[0]);
+            else
+                SetCurrentTranslator(last);
+        }
+
+        SetStatus("设置已保存");
+    }
+
+    private static OpenAiProviderConfig CloneProvider(OpenAiProviderConfig source) => new()
+    {
+        Id = source.Id,
+        Name = source.Name,
+        ApiKey = source.ApiKey,
+        BaseUrl = source.BaseUrl,
+        Model = source.Model,
+        Temperature = source.Temperature,
+        MaxTokens = source.MaxTokens,
+        Enabled = source.Enabled
+    };
 
     private void QuickTranslateFromClipboard()
     {
@@ -359,6 +464,7 @@ public partial class MainWindow : Window
         Show();
         WindowState = WindowState.Normal;
         Activate();
+        MainTabs.SelectedIndex = 0;
         InputText.Focus();
     }
 
@@ -378,5 +484,12 @@ public partial class MainWindow : Window
     private void SetStatus(string message, bool isWarning = false, bool isError = false)
     {
         StatusText.Text = message;
+        var brushKey = isError ? "DangerBrush" : isWarning ? "WarningBrush" : "TextMutedBrush";
+        StatusText.Foreground = TryFindResource(brushKey) as System.Windows.Media.Brush
+            ?? (isError
+                ? System.Windows.Media.Brushes.IndianRed
+                : isWarning
+                    ? System.Windows.Media.Brushes.DarkOrange
+                    : System.Windows.Media.Brushes.Gray);
     }
 }
