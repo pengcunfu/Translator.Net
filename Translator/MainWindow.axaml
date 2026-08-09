@@ -33,20 +33,12 @@
                     Tag="3" Click="OnNavTabClick"/>
           </StackPanel>
 
-          <!-- 网页快捷操作 -->
+          <!-- 网页快捷操作：仅站点切换 -->
           <StackPanel x:Name="WebToolbar" Orientation="Horizontal" Spacing="6"
                       VerticalAlignment="Center" DockPanel.Dock="Right">
-            <ComboBox x:Name="WebSiteCombo" Width="120"
+            <ComboBox x:Name="WebSiteCombo" Width="140"
                       DisplayMemberBinding="{Binding Name}"
                       SelectionChanged="OnWebSiteSelectionChanged"/>
-            <Button Content="←" ToolTip.Tip="后退" Classes="icon" Click="OnWebBack"/>
-            <Button Content="→" ToolTip.Tip="前进" Classes="icon" Click="OnWebForward"/>
-            <Button Content="↻" ToolTip.Tip="刷新" Classes="icon" Click="OnWebReload"/>
-            <Button Content="首页" ToolTip.Tip="打开当前网站首页" Classes="secondary" Click="OnWebHome"/>
-            <Button Content="用原文打开" ToolTip.Tip="把翻译页原文发送到当前网站（支持的站点会填入文本）"
-                    Classes="secondary" Click="OnWebOpenWithInput"/>
-            <TextBox x:Name="WebUrlBox" Width="200" IsReadOnly="True"
-                     VerticalAlignment="Center" Classes="muted"/>
           </StackPanel>
 
           <!-- 翻译快捷操作 -->
