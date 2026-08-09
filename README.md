@@ -1,13 +1,13 @@
-# 熔岩翻译助手 (.NET 10)
+# 熔岩翻译助手 (.NET 10 + Avalonia)
 
-基于 **.NET 10 + WPF** 的桌面翻译工具，由原 Python/PySide6 版本重构而来。
+基于 **.NET 10 + Avalonia** 的跨平台桌面翻译工具，由原 Python/PySide6 版本重构而来。
 
 ## 功能
 
 - **百度翻译**：通过 [百度翻译开放平台](https://fanyi-api.baidu.com/) 的 App ID 与密钥调用官方 API
 - **AI 翻译**：支持任意 **OpenAI 兼容** 接口（可配置多个），例如 OpenAI、DeepSeek、智谱 GLM、Ollama 等
-- 系统托盘、全局快捷键 **Alt+Space**（显示/隐藏窗口）
-- **开机自启动**：在设置中开启后，登录 Windows 时自动在托盘运行（不弹出主窗口）
+- 系统托盘、全局快捷键 **Alt+Space**（Windows：显示/隐藏窗口）
+- **开机自启动**（Windows）：在设置中开启后，登录时自动在托盘运行（不弹出主窗口）
 - 剪贴板快速翻译、原文/译文交换、复制结果
 
 ## 运行
@@ -16,20 +16,20 @@
 
 ```bash
 # 在仓库根目录
-dotnet run --project LavaTranslator/LavaTranslator.csproj
+dotnet run --project Translator/LavaTranslator.csproj
 ```
 
-或双击 `run.bat`。
-
-发布单文件：
+发布单文件（Windows x64 示例）：
 
 ```bash
-dotnet publish LavaTranslator/LavaTranslator.csproj -c Release -r win-x64 --self-contained
+dotnet publish Translator/LavaTranslator.csproj -c Release -r win-x64 --self-contained
 ```
+
+也可发布到 macOS / Linux（`osx-x64`、`linux-x64` 等）。非 Windows 平台上全局热键与开机自启会降级（不可用或隐藏）。
 
 ## 配置
 
-配置文件路径：`%USERPROFILE%\.lava_translator\config.json`
+配置文件路径：`%USERPROFILE%\.lava_translator\config.json`（非 Windows 为 `~/.lava_translator/config.json`）
 
 也可参考仓库中的 `appsettings.example.json`。
 
@@ -43,7 +43,7 @@ dotnet publish LavaTranslator/LavaTranslator.csproj -c Release -r win-x64 --self
 
 | 字段 | 说明 |
 |------|------|
-| 显示名称 | 菜单中显示的引擎名称 |
+| 显示名称 | 引擎列表中显示的名称 |
 | API Key | 接口密钥 |
 | Base URL | 兼容端点根地址（如 `https://api.openai.com/v1/`） |
 | 模型 | 如 `gpt-4o-mini`、`glm-4-flash`、`deepseek-chat` |
@@ -54,14 +54,14 @@ dotnet publish LavaTranslator/LavaTranslator.csproj -c Release -r win-x64 --self
 ## 项目结构
 
 ```
-agent-translate/
+Translator.Net/
 ├── LavaTranslator.slnx
-├── LavaTranslator/              # WPF 主程序
+├── Translator/                  # Avalonia 主程序
+│   ├── Assets/
+│   ├── Themes/
 │   ├── Models/
 │   ├── Services/
-│   ├── Infrastructure/
-│   └── Views/
-├── Translate/                   # 旧版 Python 代码（参考）
+│   └── Infrastructure/
 ├── appsettings.example.json
-└── run.bat
+└── scripts/
 ```

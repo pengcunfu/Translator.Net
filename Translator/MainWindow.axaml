@@ -1,0 +1,196 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LavaTranslator.MainWindow"
+        Title="熔岩翻译助手"
+        Height="580" Width="920"
+        MinHeight="420" MinWidth="700"
+        WindowStartupLocation="CenterScreen">
+  <DockPanel>
+    <Border DockPanel.Dock="Bottom"
+            Background="{DynamicResource SurfaceBrush}"
+            BorderBrush="{DynamicResource BorderBrushKey}"
+            BorderThickness="0,1,0,0"
+            Padding="10,6">
+      <StackPanel Orientation="Horizontal" Spacing="16">
+        <TextBlock x:Name="EngineLabel" Classes="muted" Text="引擎: 百度翻译"/>
+        <TextBlock x:Name="StatusText" Classes="muted" Text="Alt+Space · 准备就绪"/>
+      </StackPanel>
+    </Border>
+
+    <TabControl x:Name="MainTabs" Margin="12" SelectionChanged="OnMainTabChanged">
+      <TabItem Header="翻译">
+        <Grid Margin="0,12,0,0" RowDefinitions="Auto,*,Auto">
+          <Border Grid.Row="0" Classes="panel" Padding="10,8" Margin="0,0,0,10">
+            <DockPanel LastChildFill="False">
+              <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="0">
+                <TextBlock Text="原文" Classes="field" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                <ComboBox x:Name="SourceLanguageCombo" Width="128"
+                          DisplayMemberBinding="{Binding DisplayName}"
+                          VerticalAlignment="Center"/>
+                <Button Content="⇄" ToolTip.Tip="交换原文与目标语言" Click="OnSwapLanguages"
+                        Classes="icon" Margin="8,0"/>
+                <TextBlock Text="译文" Classes="field" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                <ComboBox x:Name="TargetLanguageCombo" Width="128"
+                          DisplayMemberBinding="{Binding DisplayName}"
+                          VerticalAlignment="Center"/>
+              </StackPanel>
+              <TextBlock DockPanel.Dock="Right" Classes="muted"
+                         Text="Ctrl+Enter 翻译" VerticalAlignment="Center"/>
+            </DockPanel>
+          </Border>
+
+          <Grid Grid.Row="1" ColumnDefinitions="*,10,*">
+            <Border Grid.Column="0" Classes="panel" Padding="0">
+              <DockPanel>
+                <Border DockPanel.Dock="Top"
+                        BorderBrush="{DynamicResource BorderBrushKey}"
+                        BorderThickness="0,0,0,1" Padding="10,7">
+                  <TextBlock Text="原文" Classes="section" Margin="0"/>
+                </Border>
+                <TextBox x:Name="InputText" Classes="editor"
+                         AcceptsReturn="True" TextWrapping="Wrap"
+                         VerticalContentAlignment="Top"/>
+              </DockPanel>
+            </Border>
+
+            <Border Grid.Column="2" Classes="panel" Padding="0">
+              <DockPanel>
+                <Border DockPanel.Dock="Top"
+                        BorderBrush="{DynamicResource BorderBrushKey}"
+                        BorderThickness="0,0,0,1" Padding="10,7">
+                  <DockPanel>
+                    <TextBlock Text="译文" Classes="section" Margin="0" VerticalAlignment="Center"/>
+                    <TextBlock DockPanel.Dock="Right" Classes="muted"
+                               Text="只读" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                  </DockPanel>
+                </Border>
+                <TextBox x:Name="OutputText" Classes="editor"
+                         AcceptsReturn="True" TextWrapping="Wrap"
+                         IsReadOnly="True" VerticalContentAlignment="Top"/>
+              </DockPanel>
+            </Border>
+          </Grid>
+
+          <DockPanel Grid.Row="2" Margin="0,10,0,0" LastChildFill="False">
+            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" Spacing="4">
+              <Button Content="清空" Click="OnClear" Classes="ghost"/>
+              <Button Content="复制" Click="OnCopy" Classes="secondary"/>
+              <Button Content="交换" Click="OnSwap" Classes="secondary" Margin="0,0,4,0"/>
+              <Button x:Name="TranslateButton" Content="翻译" Click="OnTranslate"
+                      Classes="primary" IsDefault="True"/>
+            </StackPanel>
+          </DockPanel>
+        </Grid>
+      </TabItem>
+
+      <TabItem Header="设置">
+        <Grid Margin="0,12,0,0" RowDefinitions="Auto,*,Auto">
+          <Border Grid.Row="0" Classes="panel" Padding="10,8" Margin="0,0,0,10">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="8">
+              <TextBlock Text="翻译引擎" Classes="field" Margin="0" VerticalAlignment="Center"/>
+              <ComboBox x:Name="EngineCombo" Width="220"
+                        SelectionChanged="OnEngineSelectionChanged"/>
+              <TextBlock Classes="muted" VerticalAlignment="Center"
+                         Text="在下方配置 API 后，启用的引擎会出现在此列表"/>
+            </StackPanel>
+          </Border>
+
+          <TabControl Grid.Row="1">
+            <TabItem Header="百度翻译">
+              <Border Classes="panel" Margin="0,10,0,0" Padding="14">
+                <StackPanel>
+                  <TextBlock Text="API 密钥" Classes="section"/>
+                  <TextBlock Text="App ID" Classes="field"/>
+                  <TextBox x:Name="BaiduAppIdBox" Margin="0,0,0,10"/>
+                  <TextBlock Text="密钥 (Secret Key)" Classes="field"/>
+                  <TextBox x:Name="BaiduSecretBox" PasswordChar="•"/>
+                  <TextBlock Margin="0,10,0,0" Classes="muted" TextWrapping="Wrap"
+                             Text="在 fanyi-api.baidu.com 注册通用翻译 API，获取 App ID 与密钥。"/>
+                </StackPanel>
+              </Border>
+            </TabItem>
+
+            <TabItem Header="AI 翻译">
+              <DockPanel Margin="0,10,0,0">
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="0,0,0,8">
+                  <Button Content="添加" Click="OnAddProvider" Classes="secondary"/>
+                  <Button Content="删除" Click="OnRemoveProvider" Classes="ghost"/>
+                  <Button Content="复制" Click="OnDuplicateProvider" Classes="ghost"/>
+                </StackPanel>
+                <Grid ColumnDefinitions="150,10,*">
+                  <ListBox x:Name="ProvidersList" Grid.Column="0"
+                           DisplayMemberBinding="{Binding Name}"
+                           SelectionChanged="OnProviderSelectionChanged"/>
+                  <Border Grid.Column="2" Classes="panel" Padding="12">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                      <StackPanel x:Name="ProviderEditor" IsEnabled="False">
+                        <CheckBox x:Name="ProviderEnabledBox" Content="启用此配置（出现在翻译引擎列表）"
+                                  IsChecked="True"/>
+                        <TextBlock Text="显示名称" Classes="field"/>
+                        <TextBox x:Name="ProviderNameBox" Margin="0,0,0,10"/>
+                        <TextBlock Text="API Key" Classes="field"/>
+                        <TextBox x:Name="ProviderApiKeyBox" PasswordChar="•" Margin="0,0,0,10"/>
+                        <TextBlock Text="Base URL" Classes="field"/>
+                        <TextBox x:Name="ProviderBaseUrlBox" Margin="0,0,0,10"/>
+                        <TextBlock Text="模型" Classes="field"/>
+                        <TextBox x:Name="ProviderModelBox" Margin="0,0,0,10"/>
+                        <Grid Margin="0,0,0,10" ColumnDefinitions="*,10,*">
+                          <StackPanel Grid.Column="0">
+                            <TextBlock Text="Temperature" Classes="field"/>
+                            <TextBox x:Name="ProviderTemperatureBox"/>
+                          </StackPanel>
+                          <StackPanel Grid.Column="2">
+                            <TextBlock Text="Max Tokens" Classes="field"/>
+                            <TextBox x:Name="ProviderMaxTokensBox"/>
+                          </StackPanel>
+                        </Grid>
+                        <TextBlock Classes="muted" TextWrapping="Wrap"
+                                   Text="兼容 OpenAI 协议（OpenAI、DeepSeek、智谱、Ollama 等）。Base URL 填端点根路径；仅域名时自动补 /v1/。"/>
+                      </StackPanel>
+                    </ScrollViewer>
+                  </Border>
+                </Grid>
+              </DockPanel>
+            </TabItem>
+
+            <TabItem Header="通用">
+              <Border Classes="panel" Margin="0,10,0,0" Padding="14">
+                <StackPanel>
+                  <CheckBox x:Name="RunAtStartupBox" Content="开机自动启动（登录后静默到托盘）"/>
+                  <TextBlock x:Name="StartupHint" Classes="muted" Margin="0,-4,0,8" IsVisible="False"
+                             Text="开机自启仅在 Windows 上可用。"/>
+                  <CheckBox x:Name="RememberTranslatorBox" Content="记住上次使用的翻译引擎"/>
+                  <TextBlock x:Name="HotkeyHint" Classes="muted" Margin="0,4,0,0"
+                             Text="全局快捷键：Alt+Space（显示 / 隐藏窗口）"/>
+                </StackPanel>
+              </Border>
+            </TabItem>
+          </TabControl>
+
+          <Border Grid.Row="2"
+                  BorderBrush="{DynamicResource BorderBrushKey}"
+                  BorderThickness="0,1,0,0"
+                  Margin="0,12,0,0" Padding="0,12,0,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+              <Button Content="保存设置" Click="OnSaveSettings" Classes="primary"/>
+            </StackPanel>
+          </Border>
+        </Grid>
+      </TabItem>
+
+      <TabItem Header="关于">
+        <Border Classes="panel" Margin="0,12,0,0" Padding="24" VerticalAlignment="Top">
+          <StackPanel>
+            <TextBlock Text="熔岩翻译助手" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,4"/>
+            <TextBlock Text="v1.0.0" Classes="muted" Margin="0,0,0,16"/>
+            <TextBlock Text="基于 .NET 10 + Avalonia" Margin="0,0,0,6"/>
+            <TextBlock Text="支持百度翻译 API 与 OpenAI 兼容 AI 翻译" Margin="0,0,0,16"/>
+            <TextBlock Classes="muted" Text="快捷键：Alt+Space（Windows，显示 / 隐藏窗口）"/>
+            <TextBlock Classes="muted" Margin="0,6,0,0"
+                       Text="关闭窗口后程序会继续在系统托盘运行"/>
+          </StackPanel>
+        </Border>
+      </TabItem>
+    </TabControl>
+  </DockPanel>
+</Window>

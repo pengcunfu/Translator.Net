@@ -1,18 +1,22 @@
-using System.Drawing;
+using Avalonia.Controls;
+using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 
 namespace LavaTranslator.Infrastructure;
 
 public static class AppIcon
 {
-    private static Icon? _icon;
+    private static readonly Uri IconUri = new("avares://Translator/Assets/icon.ico");
 
-    public static Icon Get()
+    public static WindowIcon CreateWindowIcon()
     {
-        if (_icon is not null)
-            return _icon;
+        using var stream = AssetLoader.Open(IconUri);
+        return new WindowIcon(stream);
+    }
 
-        var path = Path.Combine(AppContext.BaseDirectory, "icon.ico");
-        _icon = File.Exists(path) ? new Icon(path) : SystemIcons.Application;
-        return _icon;
+    public static Bitmap LoadBitmap()
+    {
+        using var stream = AssetLoader.Open(IconUri);
+        return new Bitmap(stream);
     }
 }

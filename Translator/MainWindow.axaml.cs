@@ -1,8 +1,11 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Globalization;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
+using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Input.Platform;
+using Avalonia.Interactivity;
+using Avalonia.Media;
+using Avalonia.Threading;
 using LavaTranslator.Infrastructure;
 using LavaTranslator.Models;
 using LavaTranslator.Services;
@@ -14,12 +17,24 @@ public partial class MainWindow : Window
     private readonly ConfigService _configService;
     private readonly TranslationService _translationService;
     private readonly TrayIconService _tray;
-    private GlobalHotkey? _hotkey;
+    private IGlobalHotkey? _hotkey;
     private readonly ObservableCollection<OpenAiProviderConfig> _providers = [];
     private string _currentTranslator = "百度翻译";
     private CancellationTokenSource? _translateCts;
     private bool _suppressEngineSync;
     private bool _suppressProviderSync;
+    private bool _forceClose;
+
+    /// <summary>Design-time / XAML loader entry point.</summary>
+    public MainWindow()
+        : this(new ConfigService())
+    {
+    }
+
+    private MainWindow(ConfigService configService)
+        : this(configService, new TranslationService(configService), new TrayIconService())
+    {
+    }
 
     public MainWindow(
         ConfigService configService,
@@ -27,20 +42,23 @@ public partial class MainWindow : Window
         TrayIconService tray)
     {
         InitializeComponent();
+        Icon = AppIcon.CreateWindowIcon();
+
         _configService = configService;
         _translationService = translationService;
         _tray = tray;
 
-        _configService.ConfigChanged += (_, _) => Dispatcher.Invoke(RefreshEngineList);
+        _configService.ConfigChanged += (_, _) => Dispatcher.UIThread.Post(RefreshEngineList);
 
         InitLanguageSelectors();
         LoadSettingsFields();
         RestoreLastTranslator();
         RefreshEngineList();
+        ApplyPlatformUi();
 
-        InputText.PreviewKeyDown += (_, e) =>
+        InputText.KeyDown += (_, e) =>
         {
-            if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.Control)
+            if (e.Key == Key.Enter && e.KeyModifiers.HasFlag(KeyModifiers.Control))
             {
                 e.Handled = true;
                 _ = TranslateAsync();
@@ -49,32 +67,48 @@ public partial class MainWindow : Window
 
         Closing += (_, e) =>
         {
+            if (_forceClose)
+                return;
+
             e.Cancel = true;
             Hide();
         };
     }
 
-    public void AttachHotkey(GlobalHotkey hotkey)
+    public void AttachHotkey(IGlobalHotkey hotkey)
     {
         _hotkey = hotkey;
-        _hotkey.HotkeyPressed += (_, _) => Dispatcher.Invoke(ToggleWindow);
+        _hotkey.HotkeyPressed += (_, _) => Dispatcher.UIThread.Post(ToggleWindow);
     }
 
     public void InitializeTrayHandlers()
     {
-        _tray.ShowWindowRequested += (_, _) => Dispatcher.Invoke(ShowAndActivate);
-        _tray.QuickTranslateRequested += (_, _) => Dispatcher.Invoke(QuickTranslateFromClipboard);
-        _tray.QuitRequested += (_, _) => Dispatcher.Invoke(ShutdownApp);
+        _tray.ShowWindowRequested += (_, _) => Dispatcher.UIThread.Post(ShowAndActivate);
+        _tray.QuickTranslateRequested += (_, _) => Dispatcher.UIThread.Post(() => _ = QuickTranslateFromClipboardAsync());
+        _tray.QuitRequested += (_, _) => Dispatcher.UIThread.Post(ShutdownApp);
     }
 
     public void ShowStartupNotification()
     {
         _tray.ShowBalloon(
             "熔岩翻译助手",
-            "程序已启动\n• 双击托盘图标打开窗口\n• Alt+Space 显示/隐藏\n• 右键托盘查看更多功能");
+            "程序已启动 · 托盘图标打开窗口 · Alt+Space 显示/隐藏");
     }
 
-    private void OnMainTabChanged(object sender, SelectionChangedEventArgs e)
+    private void ApplyPlatformUi()
+    {
+        if (!StartupService.IsSupported)
+        {
+            RunAtStartupBox.IsEnabled = false;
+            RunAtStartupBox.IsChecked = false;
+            StartupHint.IsVisible = true;
+        }
+
+        if (!OperatingSystem.IsWindows())
+            HotkeyHint.Text = "全局快捷键 Alt+Space 目前仅在 Windows 上可用。";
+    }
+
+    private void OnMainTabChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (!ReferenceEquals(e.Source, MainTabs))
             return;
@@ -100,8 +134,8 @@ public partial class MainWindow : Window
     {
         var config = _configService.Current;
         BaiduAppIdBox.Text = config.Baidu.AppId;
-        BaiduSecretBox.Password = config.Baidu.SecretKey;
-        RunAtStartupBox.IsChecked = config.General.RunAtStartup;
+        BaiduSecretBox.Text = config.Baidu.SecretKey;
+        RunAtStartupBox.IsChecked = config.General.RunAtStartup && StartupService.IsSupported;
         RememberTranslatorBox.IsChecked = config.General.RememberLastTranslator;
 
         _providers.Clear();
@@ -113,39 +147,42 @@ public partial class MainWindow : Window
             ProvidersList.SelectedIndex = 0;
     }
 
-    private static void SelectLanguage(System.Windows.Controls.ComboBox combo, string code, string fallback)
+    private static void SelectLanguage(ComboBox combo, string code, string fallback)
     {
         var match = LanguageCatalog.FindByCode(code) ?? LanguageCatalog.FindByCode(fallback);
         if (match is not null)
-            combo.SelectedValue = match.Code;
+            combo.SelectedItem = match;
     }
+
+    private static string GetLanguageCode(ComboBox combo, string fallback) =>
+        (combo.SelectedItem as LanguageOption)?.Code ?? fallback;
 
     private TranslationOptions GetTranslationOptions() => new()
     {
-        FromCode = SourceLanguageCombo.SelectedValue as string ?? "auto",
-        ToCode = TargetLanguageCombo.SelectedValue as string ?? "en"
+        FromCode = GetLanguageCode(SourceLanguageCombo, "auto"),
+        ToCode = GetLanguageCode(TargetLanguageCombo, "en")
     };
 
     private void SaveLanguagePreferences()
     {
         var config = _configService.Current;
-        config.General.SourceLanguage = SourceLanguageCombo.SelectedValue as string ?? "auto";
-        config.General.TargetLanguage = TargetLanguageCombo.SelectedValue as string ?? "en";
+        config.General.SourceLanguage = GetLanguageCode(SourceLanguageCombo, "auto");
+        config.General.TargetLanguage = GetLanguageCode(TargetLanguageCombo, "en");
         _configService.Save();
         UpdateLanguageStatus();
     }
 
     private void UpdateLanguageStatus()
     {
-        var from = LanguageCatalog.GetDisplayName(SourceLanguageCombo.SelectedValue as string ?? "auto");
-        var to = LanguageCatalog.GetDisplayName(TargetLanguageCombo.SelectedValue as string ?? "en");
+        var from = LanguageCatalog.GetDisplayName(GetLanguageCode(SourceLanguageCombo, "auto"));
+        var to = LanguageCatalog.GetDisplayName(GetLanguageCode(TargetLanguageCombo, "en"));
         EngineLabel.Text = $"引擎: {_currentTranslator} | {from} → {to}";
     }
 
-    private void OnSwapLanguages(object sender, RoutedEventArgs e)
+    private void OnSwapLanguages(object? sender, RoutedEventArgs e)
     {
-        var from = SourceLanguageCombo.SelectedValue as string ?? "auto";
-        var to = TargetLanguageCombo.SelectedValue as string ?? "en";
+        var from = GetLanguageCode(SourceLanguageCombo, "auto");
+        var to = GetLanguageCode(TargetLanguageCombo, "en");
 
         if (from == "auto")
         {
@@ -153,8 +190,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        SourceLanguageCombo.SelectedValue = to;
-        TargetLanguageCombo.SelectedValue = from;
+        SelectLanguage(SourceLanguageCombo, to, "en");
+        SelectLanguage(TargetLanguageCombo, from, "zh");
         SaveLanguagePreferences();
         SetStatus("已交换原文与目标语言");
     }
@@ -187,13 +224,12 @@ public partial class MainWindow : Window
     {
         _currentTranslator = name;
         _suppressEngineSync = true;
-        if (EngineCombo.Items.Contains(name))
-            EngineCombo.SelectedItem = name;
+        EngineCombo.SelectedItem = name;
         _suppressEngineSync = false;
         UpdateLanguageStatus();
     }
 
-    private void OnEngineSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void OnEngineSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (_suppressEngineSync)
             return;
@@ -205,11 +241,11 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void OnTranslate(object sender, RoutedEventArgs e) => await TranslateAsync();
+    private async void OnTranslate(object? sender, RoutedEventArgs e) => await TranslateAsync();
 
     private async Task TranslateAsync()
     {
-        var text = InputText.Text.Trim();
+        var text = InputText.Text?.Trim() ?? "";
         if (string.IsNullOrEmpty(text))
         {
             SetStatus("请输入要翻译的文本", isWarning: true);
@@ -266,15 +302,15 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnClear(object sender, RoutedEventArgs e)
+    private void OnClear(object? sender, RoutedEventArgs e)
     {
-        InputText.Clear();
-        OutputText.Clear();
+        InputText.Text = "";
+        OutputText.Text = "";
         InputText.Focus();
         SetStatus("内容已清空");
     }
 
-    private void OnCopy(object sender, RoutedEventArgs e)
+    private async void OnCopy(object? sender, RoutedEventArgs e)
     {
         if (string.IsNullOrWhiteSpace(OutputText.Text))
         {
@@ -282,11 +318,18 @@ public partial class MainWindow : Window
             return;
         }
 
-        Clipboard.SetText(OutputText.Text);
+        var clipboard = GetTopLevel(this)?.Clipboard;
+        if (clipboard is null)
+        {
+            SetStatus("无法访问剪贴板", isError: true);
+            return;
+        }
+
+        await clipboard.SetTextAsync(OutputText.Text);
         SetStatus("翻译结果已复制到剪贴板");
     }
 
-    private void OnSwap(object sender, RoutedEventArgs e)
+    private void OnSwap(object? sender, RoutedEventArgs e)
     {
         if (string.IsNullOrWhiteSpace(OutputText.Text))
         {
@@ -295,13 +338,13 @@ public partial class MainWindow : Window
         }
 
         InputText.Text = OutputText.Text;
-        OutputText.Clear();
+        OutputText.Text = "";
         OnSwapLanguages(sender, e);
         InputText.Focus();
         SetStatus("内容与语言方向已交换");
     }
 
-    private void OnAddProvider(object sender, RoutedEventArgs e)
+    private void OnAddProvider(object? sender, RoutedEventArgs e)
     {
         var provider = new OpenAiProviderConfig
         {
@@ -314,7 +357,7 @@ public partial class MainWindow : Window
         ProvidersList.SelectedItem = provider;
     }
 
-    private void OnRemoveProvider(object sender, RoutedEventArgs e)
+    private void OnRemoveProvider(object? sender, RoutedEventArgs e)
     {
         if (ProvidersList.SelectedItem is not OpenAiProviderConfig selected)
             return;
@@ -325,7 +368,7 @@ public partial class MainWindow : Window
             ProvidersList.SelectedIndex = 0;
     }
 
-    private void OnDuplicateProvider(object sender, RoutedEventArgs e)
+    private void OnDuplicateProvider(object? sender, RoutedEventArgs e)
     {
         if (ProvidersList.SelectedItem is not OpenAiProviderConfig selected)
             return;
@@ -338,7 +381,7 @@ public partial class MainWindow : Window
         ProvidersList.SelectedItem = copy;
     }
 
-    private void OnProviderSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private void OnProviderSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (_suppressProviderSync)
             return;
@@ -357,7 +400,7 @@ public partial class MainWindow : Window
         _suppressProviderSync = true;
         ProviderEnabledBox.IsChecked = provider.Enabled;
         ProviderNameBox.Text = provider.Name;
-        ProviderApiKeyBox.Password = provider.ApiKey;
+        ProviderApiKeyBox.Text = provider.ApiKey;
         ProviderBaseUrlBox.Text = provider.BaseUrl;
         ProviderModelBox.Text = provider.Model;
         ProviderTemperatureBox.Text = provider.Temperature.ToString(CultureInfo.InvariantCulture);
@@ -367,12 +410,12 @@ public partial class MainWindow : Window
 
     private void SaveEditorToProvider(OpenAiProviderConfig provider)
     {
-        provider.Name = ProviderNameBox.Text.Trim();
-        provider.ApiKey = ProviderApiKeyBox.Password;
+        provider.Name = ProviderNameBox.Text?.Trim() ?? "";
+        provider.ApiKey = ProviderApiKeyBox.Text ?? "";
         provider.Enabled = ProviderEnabledBox.IsChecked == true
             || !string.IsNullOrWhiteSpace(provider.ApiKey);
-        provider.BaseUrl = ProviderBaseUrlBox.Text.Trim();
-        provider.Model = ProviderModelBox.Text.Trim();
+        provider.BaseUrl = ProviderBaseUrlBox.Text?.Trim() ?? "";
+        provider.Model = ProviderModelBox.Text?.Trim() ?? "";
 
         if (double.TryParse(ProviderTemperatureBox.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var temp))
             provider.Temperature = Math.Clamp(temp, 0, 2);
@@ -381,7 +424,7 @@ public partial class MainWindow : Window
             provider.MaxTokens = Math.Clamp(maxTokens, 100, 128000);
     }
 
-    private void OnSaveSettings(object sender, RoutedEventArgs e)
+    private async void OnSaveSettings(object? sender, RoutedEventArgs e)
     {
         if (ProvidersList.SelectedItem is OpenAiProviderConfig selected)
             SaveEditorToProvider(selected);
@@ -389,26 +432,24 @@ public partial class MainWindow : Window
         var config = _configService.Current;
         config.Baidu = new BaiduConfig
         {
-            AppId = BaiduAppIdBox.Text.Trim(),
-            SecretKey = BaiduSecretBox.Password
+            AppId = BaiduAppIdBox.Text?.Trim() ?? "",
+            SecretKey = BaiduSecretBox.Text ?? ""
         };
         config.OpenAiProviders = _providers.Select(CloneProvider).ToList();
-        config.General.RunAtStartup = RunAtStartupBox.IsChecked == true;
+        config.General.RunAtStartup = StartupService.IsSupported && RunAtStartupBox.IsChecked == true;
         config.General.RememberLastTranslator = RememberTranslatorBox.IsChecked == true;
 
         if (!_configService.Save(config))
         {
-            MessageBox.Show(this, "保存配置失败", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+            await DialogHelper.ShowAsync(this, "保存配置失败", "错误");
             return;
         }
 
-        if (!StartupService.SetEnabled(config.General.RunAtStartup))
+        if (StartupService.IsSupported && !StartupService.SetEnabled(config.General.RunAtStartup))
         {
-            MessageBox.Show(this,
+            await DialogHelper.ShowAsync(this,
                 "配置已保存，但无法更新开机自启动设置。请检查是否有权限修改注册表。",
-                "警告",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+                "警告");
         }
 
         RefreshEngineList();
@@ -439,24 +480,20 @@ public partial class MainWindow : Window
         Enabled = source.Enabled
     };
 
-    private void QuickTranslateFromClipboard()
+    private async Task QuickTranslateFromClipboardAsync()
     {
-        if (!Clipboard.ContainsText())
-        {
-            _tray.ShowBalloon("熔岩翻译助手", "剪贴板中没有文本", System.Windows.Forms.ToolTipIcon.Warning);
-            return;
-        }
-
-        var text = Clipboard.GetText().Trim();
+        var clipboard = GetTopLevel(this)?.Clipboard;
+        var text = clipboard is null ? null : await clipboard.TryGetTextAsync();
+        text = text?.Trim();
         if (string.IsNullOrEmpty(text))
         {
-            _tray.ShowBalloon("熔岩翻译助手", "剪贴板中没有文本", System.Windows.Forms.ToolTipIcon.Warning);
+            _tray.ShowBalloon("熔岩翻译助手", "剪贴板中没有文本");
             return;
         }
 
         ShowAndActivate();
         InputText.Text = text;
-        _ = TranslateAsync();
+        await TranslateAsync();
     }
 
     public void ShowAndActivate()
@@ -478,18 +515,21 @@ public partial class MainWindow : Window
 
     private void ShutdownApp()
     {
-        System.Windows.Application.Current.Shutdown();
+        _forceClose = true;
+        if (Avalonia.Application.Current?.ApplicationLifetime is
+            Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            desktop.Shutdown();
+        }
     }
 
     private void SetStatus(string message, bool isWarning = false, bool isError = false)
     {
         StatusText.Text = message;
         var brushKey = isError ? "DangerBrush" : isWarning ? "WarningBrush" : "TextMutedBrush";
-        StatusText.Foreground = TryFindResource(brushKey) as System.Windows.Media.Brush
-            ?? (isError
-                ? System.Windows.Media.Brushes.IndianRed
-                : isWarning
-                    ? System.Windows.Media.Brushes.DarkOrange
-                    : System.Windows.Media.Brushes.Gray);
+        if (TryGetResource(brushKey, ActualThemeVariant, out var resource) && resource is IBrush brush)
+            StatusText.Foreground = brush;
+        else
+            StatusText.Foreground = isError ? Brushes.IndianRed : isWarning ? Brushes.DarkOrange : Brushes.Gray;
     }
 }
