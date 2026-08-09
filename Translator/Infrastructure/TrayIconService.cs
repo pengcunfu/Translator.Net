@@ -37,9 +37,7 @@ public sealed class TrayIconService : IDisposable
             Menu = new NativeMenu
             {
                 showItem,
-                new NativeMenuItemSeparator(),
                 quickItem,
-                new NativeMenuItemSeparator(),
                 quitItem
             }
         };

@@ -56,7 +56,7 @@ dotnet publish Translator/LavaTranslator.csproj -c Release -r win-x64 --self-con
 
 ```
 Translator.Net/
-├── LavaTranslator.slnx
+├── Translator.slnx
 ├── Translator/                  # Avalonia 主程序
 │   ├── Assets/
 │   ├── Themes/
