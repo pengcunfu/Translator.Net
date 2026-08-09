@@ -33,4 +33,5 @@ public sealed class GeneralConfig
     public string Hotkey { get; set; } = "Alt+Space";
     public string SourceLanguage { get; set; } = "auto";
     public string TargetLanguage { get; set; } = "en";
+    public string LastWebSiteId { get; set; } = "youdao";
 }

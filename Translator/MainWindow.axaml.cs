@@ -23,7 +23,9 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _translateCts;
     private bool _suppressEngineSync;
     private bool _suppressProviderSync;
+    private bool _suppressWebSiteSync;
     private bool _forceClose;
+    private bool _webInitialized;
 
     /// <summary>Design-time / XAML loader entry point.</summary>
     public MainWindow()
@@ -51,6 +53,7 @@ public partial class MainWindow : Window
         _configService.ConfigChanged += (_, _) => Dispatcher.UIThread.Post(RefreshEngineList);
 
         InitLanguageSelectors();
+        InitWebSites();
         LoadSettingsFields();
         RestoreLastTranslator();
         RefreshEngineList();
@@ -114,6 +117,136 @@ public partial class MainWindow : Window
             return;
 
         TranslateButton.IsDefault = MainTabs.SelectedIndex == 0;
+
+        // 首次进入「网页」再加载，避免启动时立刻拉起 WebView2
+        if (MainTabs.SelectedIndex == 1 && !_webInitialized)
+            NavigateSelectedWebSite(withInputText: false);
+    }
+
+    private void InitWebSites()
+    {
+        WebSiteCombo.ItemsSource = WebTranslateCatalog.All;
+        var lastId = _configService.Current.General.LastWebSiteId;
+        var site = WebTranslateCatalog.FindById(lastId) ?? WebTranslateCatalog.All[0];
+
+        _suppressWebSiteSync = true;
+        WebSiteCombo.SelectedItem = site;
+        _suppressWebSiteSync = false;
+    }
+
+    private WebTranslateSite? CurrentWebSite => WebSiteCombo.SelectedItem as WebTranslateSite;
+
+    private void OnWebSiteSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressWebSiteSync)
+            return;
+
+        if (CurrentWebSite is not { } site)
+            return;
+
+        _configService.Current.General.LastWebSiteId = site.Id;
+        _configService.Save();
+        NavigateSelectedWebSite(withInputText: false);
+    }
+
+    private void NavigateSelectedWebSite(bool withInputText)
+    {
+        if (CurrentWebSite is not { } site)
+            return;
+
+        var text = withInputText ? InputText.Text : null;
+        var url = site.ResolveUrl(text);
+        try
+        {
+            WebView.Source = url;
+            WebUrlBox.Text = url.ToString();
+            _webInitialized = true;
+            SetStatus(withInputText && site.BuildUrlWithText is not null
+                ? $"已在 {site.Name} 打开原文"
+                : $"已加载 {site.Name}");
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"无法打开网页：{ex.Message}", isError: true);
+        }
+    }
+
+    private void OnWebBack(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (WebView.CanGoBack)
+                WebView.GoBack();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"后退失败：{ex.Message}", isWarning: true);
+        }
+    }
+
+    private void OnWebForward(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (WebView.CanGoForward)
+                WebView.GoForward();
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"前进失败：{ex.Message}", isWarning: true);
+        }
+    }
+
+    private void OnWebReload(object? sender, RoutedEventArgs e)
+    {
+        try
+        {
+            WebView.Refresh();
+            SetStatus("正在刷新网页...");
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"刷新失败：{ex.Message}", isWarning: true);
+        }
+    }
+
+    private void OnWebHome(object? sender, RoutedEventArgs e) =>
+        NavigateSelectedWebSite(withInputText: false);
+
+    private void OnWebOpenWithInput(object? sender, RoutedEventArgs e)
+    {
+        var text = InputText.Text?.Trim();
+        if (string.IsNullOrEmpty(text))
+        {
+            SetStatus("请先在「翻译」页填写原文", isWarning: true);
+            return;
+        }
+
+        if (CurrentWebSite is { BuildUrlWithText: null } site)
+        {
+            // 站点无直达链接时，至少复制原文方便粘贴
+            _ = CopyTextToClipboardAsync(text);
+            SetStatus($"{site.Name} 不支持链接传参，原文已复制，请在网页中粘贴", isWarning: true);
+        }
+
+        MainTabs.SelectedIndex = 1;
+        NavigateSelectedWebSite(withInputText: true);
+    }
+
+    private void OnWebNavigationCompleted(object? sender, WebViewNavigationCompletedEventArgs e)
+    {
+        if (WebView.Source is { } uri)
+            WebUrlBox.Text = uri.ToString();
+
+        if (!e.IsSuccess)
+            SetStatus("网页加载失败，请检查网络或 WebView2 运行时", isError: true);
+    }
+
+    private async Task CopyTextToClipboardAsync(string text)
+    {
+        var clipboard = GetTopLevel(this)?.Clipboard;
+        if (clipboard is not null)
+            await clipboard.SetTextAsync(text);
     }
 
     private void InitLanguageSelectors()

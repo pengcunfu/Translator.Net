@@ -2,8 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="LavaTranslator.MainWindow"
         Title="熔岩翻译助手"
-        Height="580" Width="920"
-        MinHeight="420" MinWidth="700"
+        Height="640" Width="980"
+        MinHeight="480" MinWidth="760"
         WindowStartupLocation="CenterScreen">
   <DockPanel>
     <Border DockPanel.Dock="Bottom"
@@ -80,6 +80,35 @@
                       Classes="primary" IsDefault="True"/>
             </StackPanel>
           </DockPanel>
+        </Grid>
+      </TabItem>
+
+      <TabItem Header="网页">
+        <Grid Margin="0,12,0,0" RowDefinitions="Auto,*">
+          <Border Grid.Row="0" Classes="panel" Padding="8,6" Margin="0,0,0,10">
+            <DockPanel LastChildFill="True">
+              <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
+                          DockPanel.Dock="Left">
+                <TextBlock Text="网站" Classes="field" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                <ComboBox x:Name="WebSiteCombo" Width="140"
+                          DisplayMemberBinding="{Binding Name}"
+                          SelectionChanged="OnWebSiteSelectionChanged"/>
+                <Button Content="←" ToolTip.Tip="后退" Classes="icon" Click="OnWebBack"/>
+                <Button Content="→" ToolTip.Tip="前进" Classes="icon" Click="OnWebForward"/>
+                <Button Content="↻" ToolTip.Tip="刷新" Classes="icon" Click="OnWebReload"/>
+                <Button Content="首页" ToolTip.Tip="打开当前网站首页" Classes="secondary" Click="OnWebHome"/>
+                <Button Content="用原文打开" ToolTip.Tip="把翻译页原文发送到当前网站（支持的站点会填入文本）"
+                        Classes="secondary" Click="OnWebOpenWithInput"/>
+              </StackPanel>
+              <TextBox x:Name="WebUrlBox" Margin="10,0,0,0" IsReadOnly="True"
+                       VerticalAlignment="Center" Classes="muted"/>
+            </DockPanel>
+          </Border>
+
+          <Border Grid.Row="1" Classes="panel" Padding="0" ClipToBounds="True">
+            <NativeWebView x:Name="WebView"
+                           NavigationCompleted="OnWebNavigationCompleted"/>
+          </Border>
         </Grid>
       </TabItem>
 
@@ -184,8 +213,10 @@
             <TextBlock Text="熔岩翻译助手" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,4"/>
             <TextBlock Text="v1.0.0" Classes="muted" Margin="0,0,0,16"/>
             <TextBlock Text="基于 .NET 10 + Avalonia" Margin="0,0,0,6"/>
-            <TextBlock Text="支持百度翻译 API 与 OpenAI 兼容 AI 翻译" Margin="0,0,0,16"/>
+            <TextBlock Text="支持百度翻译 API、OpenAI 兼容 AI 翻译，以及网页内嵌翻译站" Margin="0,0,0,16"/>
             <TextBlock Classes="muted" Text="快捷键：Alt+Space（Windows，显示 / 隐藏窗口）"/>
+            <TextBlock Classes="muted" Margin="0,6,0,0"
+                       Text="网页翻译内嵌有道、搜狗、百度、谷歌、DeepL 等站点（Windows 需 WebView2）"/>
             <TextBlock Classes="muted" Margin="0,6,0,0"
                        Text="关闭窗口后程序会继续在系统托盘运行"/>
           </StackPanel>
