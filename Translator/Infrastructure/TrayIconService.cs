@@ -9,7 +9,6 @@ public sealed class TrayIconService : IDisposable
     private TrayIcon? _trayIcon;
 
     public event EventHandler? ShowWindowRequested;
-    public event EventHandler? QuickTranslateRequested;
     public event EventHandler? QuitRequested;
 
     public void Show()
@@ -23,9 +22,6 @@ public sealed class TrayIconService : IDisposable
         var showItem = new NativeMenuItem("显示窗口");
         showItem.Click += (_, _) => Raise(ShowWindowRequested);
 
-        var quickItem = new NativeMenuItem("快速翻译（剪贴板）");
-        quickItem.Click += (_, _) => Raise(QuickTranslateRequested);
-
         var quitItem = new NativeMenuItem("退出程序");
         quitItem.Click += (_, _) => Raise(QuitRequested);
 
@@ -37,7 +33,6 @@ public sealed class TrayIconService : IDisposable
             Menu = new NativeMenu
             {
                 showItem,
-                quickItem,
                 quitItem
             }
         };

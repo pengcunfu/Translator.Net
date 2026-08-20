@@ -9,7 +9,6 @@ namespace LavaTranslator;
 public partial class App : Application
 {
     private ConfigService? _configService;
-    private TranslationService? _translationService;
     private TrayIconService? _tray;
     private IGlobalHotkey? _hotkey;
     private MainWindow? _mainWindow;
@@ -28,10 +27,9 @@ public partial class App : Application
             _configService = new ConfigService();
             StartupService.SyncWithConfig(_configService.Current.General.RunAtStartup);
 
-            _translationService = new TranslationService(_configService);
             _tray = new TrayIconService();
 
-            _mainWindow = new MainWindow(_configService, _translationService, _tray);
+            _mainWindow = new MainWindow(_configService, _tray);
             _hotkey = GlobalHotkey.Create(_mainWindow);
             _mainWindow.AttachHotkey(_hotkey);
             _mainWindow.InitializeTrayHandlers();

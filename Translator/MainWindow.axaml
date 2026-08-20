@@ -11,54 +11,28 @@
             BorderBrush="{DynamicResource BorderBrushKey}"
             BorderThickness="0,1,0,0"
             Padding="10,6">
-      <StackPanel Orientation="Horizontal" Spacing="16">
-        <TextBlock x:Name="EngineLabel" Classes="muted" Text="引擎: 百度翻译"/>
-        <TextBlock x:Name="StatusText" Classes="muted" Text="Alt+Space · 准备就绪"/>
-      </StackPanel>
+      <TextBlock x:Name="StatusText" Classes="muted" Text="Alt+Space · 准备就绪"/>
     </Border>
 
     <Grid Margin="12,8,12,12" RowDefinitions="Auto,*">
-      <!-- 顶栏：左 Tab + 右快捷操作 -->
+      <!-- 顶栏：左 Tab + 右站点切换 -->
       <Border Grid.Row="0" Classes="panel" Padding="8,4" Margin="0,0,0,10">
         <DockPanel LastChildFill="False">
           <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center"
                       DockPanel.Dock="Left">
             <Button x:Name="TabWebButton" Content="网页" Classes="nav-tab selected"
                     Tag="0" Click="OnNavTabClick"/>
-            <Button x:Name="TabTranslateButton" Content="翻译" Classes="nav-tab"
-                    Tag="1" Click="OnNavTabClick"/>
             <Button x:Name="TabSettingsButton" Content="设置" Classes="nav-tab"
-                    Tag="2" Click="OnNavTabClick"/>
+                    Tag="1" Click="OnNavTabClick"/>
             <Button x:Name="TabAboutButton" Content="关于" Classes="nav-tab"
-                    Tag="3" Click="OnNavTabClick"/>
+                    Tag="2" Click="OnNavTabClick"/>
           </StackPanel>
 
-          <!-- 网页快捷操作：仅站点切换 -->
           <StackPanel x:Name="WebToolbar" Orientation="Horizontal" Spacing="6"
                       VerticalAlignment="Center" DockPanel.Dock="Right">
             <ComboBox x:Name="WebSiteCombo" Width="140"
                       DisplayMemberBinding="{Binding Name}"
                       SelectionChanged="OnWebSiteSelectionChanged"/>
-          </StackPanel>
-
-          <!-- 翻译快捷操作 -->
-          <StackPanel x:Name="TranslateToolbar" Orientation="Horizontal" Spacing="6"
-                      VerticalAlignment="Center" DockPanel.Dock="Right" IsVisible="False">
-            <TextBlock Text="引擎" Classes="field" Margin="0" VerticalAlignment="Center"/>
-            <ComboBox x:Name="EngineCombo" Width="140"
-                      SelectionChanged="OnEngineSelectionChanged"
-                      ToolTip.Tip="在「设置」中配置 API 后，启用的引擎会出现在此列表"/>
-            <TextBlock Text="原文" Classes="field" Margin="8,0,0,0" VerticalAlignment="Center"/>
-            <ComboBox x:Name="SourceLanguageCombo" Width="110"
-                      DisplayMemberBinding="{Binding DisplayName}"
-                      VerticalAlignment="Center"/>
-            <Button Content="⇄" ToolTip.Tip="交换原文与目标语言" Click="OnSwapLanguages"
-                    Classes="icon"/>
-            <TextBlock Text="译文" Classes="field" Margin="0" VerticalAlignment="Center"/>
-            <ComboBox x:Name="TargetLanguageCombo" Width="110"
-                      DisplayMemberBinding="{Binding DisplayName}"
-                      VerticalAlignment="Center"/>
-            <TextBlock Classes="muted" Text="Ctrl+Enter" VerticalAlignment="Center" Margin="4,0,0,0"/>
           </StackPanel>
         </DockPanel>
       </Border>
@@ -72,81 +46,17 @@
                          NavigationCompleted="OnWebNavigationCompleted"/>
         </Border>
 
-        <!-- 翻译 -->
-        <Grid x:Name="TranslatePage" IsVisible="False" RowDefinitions="*,Auto">
-          <Grid Grid.Row="0" ColumnDefinitions="*,10,*">
-            <Border Grid.Column="0" Classes="panel" Padding="0">
-              <DockPanel>
-                <Border DockPanel.Dock="Top"
-                        BorderBrush="{DynamicResource BorderBrushKey}"
-                        BorderThickness="0,0,0,1" Padding="10,7">
-                  <TextBlock Text="原文" Classes="section" Margin="0"/>
-                </Border>
-                <TextBox x:Name="InputText" Classes="editor"
-                         AcceptsReturn="True" TextWrapping="Wrap"
-                         VerticalContentAlignment="Top"/>
-              </DockPanel>
-            </Border>
-
-            <Border Grid.Column="2" Classes="panel" Padding="0">
-              <DockPanel>
-                <Border DockPanel.Dock="Top"
-                        BorderBrush="{DynamicResource BorderBrushKey}"
-                        BorderThickness="0,0,0,1" Padding="10,7">
-                  <DockPanel>
-                    <TextBlock Text="译文" Classes="section" Margin="0" VerticalAlignment="Center"/>
-                    <TextBlock DockPanel.Dock="Right" Classes="muted"
-                               Text="只读" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                  </DockPanel>
-                </Border>
-                <TextBox x:Name="OutputText" Classes="editor"
-                         AcceptsReturn="True" TextWrapping="Wrap"
-                         IsReadOnly="True" VerticalContentAlignment="Top"/>
-              </DockPanel>
-            </Border>
-          </Grid>
-
-          <DockPanel Grid.Row="1" Margin="0,10,0,0" LastChildFill="False">
-            <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" Spacing="4">
-              <Button Content="清空" Click="OnClear" Classes="ghost"/>
-              <Button Content="复制" Click="OnCopy" Classes="secondary"/>
-              <Button Content="交换" Click="OnSwap" Classes="secondary" Margin="0,0,4,0"/>
-              <Button x:Name="TranslateButton" Content="翻译" Click="OnTranslate"
-                      Classes="primary" IsDefault="False"/>
-            </StackPanel>
-          </DockPanel>
-        </Grid>
-
         <!-- 设置 -->
         <Grid x:Name="SettingsPage" IsVisible="False" RowDefinitions="*,Auto">
-          <TabControl Grid.Row="0">
-            <TabItem Header="百度翻译">
-              <Border Classes="panel" Margin="0,10,0,0" Padding="14">
-                <StackPanel>
-                  <TextBlock Text="API 密钥" Classes="section"/>
-                  <TextBlock Text="App ID" Classes="field"/>
-                  <TextBox x:Name="BaiduAppIdBox" Margin="0,0,0,10"/>
-                  <TextBlock Text="密钥 (Secret Key)" Classes="field"/>
-                  <TextBox x:Name="BaiduSecretBox" PasswordChar="•"/>
-                  <TextBlock Margin="0,10,0,0" Classes="muted" TextWrapping="Wrap"
-                             Text="在 fanyi-api.baidu.com 注册通用翻译 API，获取 App ID 与密钥。"/>
-                </StackPanel>
-              </Border>
-            </TabItem>
-
-            <TabItem Header="通用">
-              <Border Classes="panel" Margin="0,10,0,0" Padding="14">
-                <StackPanel>
-                  <CheckBox x:Name="RunAtStartupBox" Content="开机自动启动（登录后静默到托盘）"/>
-                  <TextBlock x:Name="StartupHint" Classes="muted" Margin="0,-4,0,8" IsVisible="False"
-                             Text="开机自启仅在 Windows 上可用。"/>
-                  <CheckBox x:Name="RememberTranslatorBox" Content="记住上次使用的翻译引擎"/>
-                  <TextBlock x:Name="HotkeyHint" Classes="muted" Margin="0,4,0,0"
-                             Text="全局快捷键：Alt+Space（剪贴板有内容时自动填入当前翻译平台，否则显示 / 隐藏）"/>
-                </StackPanel>
-              </Border>
-            </TabItem>
-          </TabControl>
+          <Border Grid.Row="0" Classes="panel" Margin="0,10,0,0" Padding="14">
+            <StackPanel>
+              <CheckBox x:Name="RunAtStartupBox" Content="开机自动启动（登录后静默到托盘）"/>
+              <TextBlock x:Name="StartupHint" Classes="muted" Margin="0,-4,0,8" IsVisible="False"
+                         Text="开机自启仅在 Windows 上可用。"/>
+              <TextBlock x:Name="HotkeyHint" Classes="muted" Margin="0,4,0,0"
+                         Text="全局快捷键：Alt+Space（剪贴板有内容时自动填入当前网页翻译站，否则显示 / 隐藏）"/>
+            </StackPanel>
+          </Border>
 
           <Border Grid.Row="1"
                   BorderBrush="{DynamicResource BorderBrushKey}"
@@ -164,8 +74,8 @@
             <TextBlock Text="熔岩翻译助手" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,4"/>
             <TextBlock Text="v1.0.0" Classes="muted" Margin="0,0,0,16"/>
             <TextBlock Text="基于 .NET 10 + Avalonia" Margin="0,0,0,6"/>
-            <TextBlock Text="支持百度翻译 API，以及网页内嵌翻译站" Margin="0,0,0,16"/>
-            <TextBlock Classes="muted" Text="快捷键：Alt+Space（Windows，剪贴板有内容时自动填入当前翻译平台）"/>
+            <TextBlock Text="内嵌有道、搜狗、百度、谷歌、DeepL、必应、腾讯等网页翻译站" Margin="0,0,0,16"/>
+            <TextBlock Classes="muted" Text="快捷键：Alt+Space（Windows，剪贴板有内容时自动填入当前网页翻译站）"/>
             <TextBlock Classes="muted" Margin="0,6,0,0"
                        Text="网页翻译内嵌有道、搜狗、百度、谷歌、DeepL 等站点（Windows 需 WebView2）"/>
             <TextBlock Classes="muted" Margin="0,6,0,0"

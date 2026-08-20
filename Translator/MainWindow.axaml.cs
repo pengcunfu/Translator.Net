@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Media;
@@ -14,12 +13,8 @@ namespace LavaTranslator;
 public partial class MainWindow : Window
 {
     private readonly ConfigService _configService;
-    private readonly TranslationService _translationService;
     private readonly TrayIconService _tray;
     private IGlobalHotkey? _hotkey;
-    private string _currentTranslator = "百度翻译";
-    private CancellationTokenSource? _translateCts;
-    private bool _suppressEngineSync;
     private bool _suppressWebSiteSync;
     private bool _forceClose;
     private bool _webInitialized;
@@ -29,34 +24,20 @@ public partial class MainWindow : Window
 
     /// <summary>Design-time / XAML loader entry point.</summary>
     public MainWindow()
-        : this(new ConfigService())
+        : this(new ConfigService(), new TrayIconService())
     {
     }
 
-    private MainWindow(ConfigService configService)
-        : this(configService, new TranslationService(configService), new TrayIconService())
-    {
-    }
-
-    public MainWindow(
-        ConfigService configService,
-        TranslationService translationService,
-        TrayIconService tray)
+    public MainWindow(ConfigService configService, TrayIconService tray)
     {
         InitializeComponent();
         Icon = AppIcon.CreateWindowIcon();
 
         _configService = configService;
-        _translationService = translationService;
         _tray = tray;
 
-        _configService.ConfigChanged += (_, _) => Dispatcher.UIThread.Post(RefreshEngineList);
-
-        InitLanguageSelectors();
         InitWebSites();
         LoadSettingsFields();
-        RestoreLastTranslator();
-        RefreshEngineList();
         ApplyPlatformUi();
 
         SelectMainTab(0);
@@ -66,15 +47,6 @@ public partial class MainWindow : Window
         {
             if (!_webInitialized)
                 NavigateSelectedWebSite();
-        };
-
-        InputText.KeyDown += (_, e) =>
-        {
-            if (e.Key == Key.Enter && e.KeyModifiers.HasFlag(KeyModifiers.Control))
-            {
-                e.Handled = true;
-                _ = TranslateAsync();
-            }
         };
 
         Closing += (_, e) =>
@@ -96,7 +68,6 @@ public partial class MainWindow : Window
     public void InitializeTrayHandlers()
     {
         _tray.ShowWindowRequested += (_, _) => Dispatcher.UIThread.Post(ShowAndActivate);
-        _tray.QuickTranslateRequested += (_, _) => Dispatcher.UIThread.Post(() => _ = QuickTranslateFromClipboardAsync());
         _tray.QuitRequested += (_, _) => Dispatcher.UIThread.Post(ShutdownApp);
     }
 
@@ -133,19 +104,14 @@ public partial class MainWindow : Window
         _mainTabIndex = index;
 
         WebPage.IsVisible = index == 0;
-        TranslatePage.IsVisible = index == 1;
-        SettingsPage.IsVisible = index == 2;
-        AboutPage.IsVisible = index == 3;
+        SettingsPage.IsVisible = index == 1;
+        AboutPage.IsVisible = index == 2;
 
         WebToolbar.IsVisible = index == 0;
-        TranslateToolbar.IsVisible = index == 1;
 
         SetNavTabSelected(TabWebButton, index == 0);
-        SetNavTabSelected(TabTranslateButton, index == 1);
-        SetNavTabSelected(TabSettingsButton, index == 2);
-        SetNavTabSelected(TabAboutButton, index == 3);
-
-        TranslateButton.IsDefault = index == 1;
+        SetNavTabSelected(TabSettingsButton, index == 1);
+        SetNavTabSelected(TabAboutButton, index == 2);
 
         if (index == 0 && !_webInitialized)
             NavigateSelectedWebSite();
@@ -249,227 +215,16 @@ public partial class MainWindow : Window
         }
     }
 
-    private void InitLanguageSelectors()
-    {
-        SourceLanguageCombo.ItemsSource = LanguageCatalog.SourceLanguages;
-        TargetLanguageCombo.ItemsSource = LanguageCatalog.TargetLanguages;
-
-        var general = _configService.Current.General;
-        SelectLanguage(SourceLanguageCombo, general.SourceLanguage, "auto");
-        SelectLanguage(TargetLanguageCombo, general.TargetLanguage, "en");
-
-        SourceLanguageCombo.SelectionChanged += (_, _) => SaveLanguagePreferences();
-        TargetLanguageCombo.SelectionChanged += (_, _) => SaveLanguagePreferences();
-        UpdateLanguageStatus();
-    }
-
     private void LoadSettingsFields()
     {
         var config = _configService.Current;
-        BaiduAppIdBox.Text = config.Baidu.AppId;
-        BaiduSecretBox.Text = config.Baidu.SecretKey;
         RunAtStartupBox.IsChecked = config.General.RunAtStartup && StartupService.IsSupported;
-        RememberTranslatorBox.IsChecked = config.General.RememberLastTranslator;
-    }
-
-    private static void SelectLanguage(ComboBox combo, string code, string fallback)
-    {
-        var match = LanguageCatalog.FindByCode(code) ?? LanguageCatalog.FindByCode(fallback);
-        if (match is not null)
-            combo.SelectedItem = match;
-    }
-
-    private static string GetLanguageCode(ComboBox combo, string fallback) =>
-        (combo.SelectedItem as LanguageOption)?.Code ?? fallback;
-
-    private TranslationOptions GetTranslationOptions() => new()
-    {
-        FromCode = GetLanguageCode(SourceLanguageCombo, "auto"),
-        ToCode = GetLanguageCode(TargetLanguageCombo, "en")
-    };
-
-    private void SaveLanguagePreferences()
-    {
-        var config = _configService.Current;
-        config.General.SourceLanguage = GetLanguageCode(SourceLanguageCombo, "auto");
-        config.General.TargetLanguage = GetLanguageCode(TargetLanguageCombo, "en");
-        _configService.Save();
-        UpdateLanguageStatus();
-    }
-
-    private void UpdateLanguageStatus()
-    {
-        var from = LanguageCatalog.GetDisplayName(GetLanguageCode(SourceLanguageCombo, "auto"));
-        var to = LanguageCatalog.GetDisplayName(GetLanguageCode(TargetLanguageCombo, "en"));
-        EngineLabel.Text = $"引擎: {_currentTranslator} | {from} → {to}";
-    }
-
-    private void OnSwapLanguages(object? sender, RoutedEventArgs e)
-    {
-        var from = GetLanguageCode(SourceLanguageCombo, "auto");
-        var to = GetLanguageCode(TargetLanguageCombo, "en");
-
-        if (from == "auto")
-        {
-            SetStatus("原文为自动检测时，请手动选择原文语言后再交换", isWarning: true);
-            return;
-        }
-
-        SelectLanguage(SourceLanguageCombo, to, "en");
-        SelectLanguage(TargetLanguageCombo, from, "zh");
-        SaveLanguagePreferences();
-        SetStatus("已交换原文与目标语言");
-    }
-
-    private void RestoreLastTranslator()
-    {
-        var general = _configService.Current.General;
-        if (general.RememberLastTranslator && !string.IsNullOrWhiteSpace(general.LastTranslator))
-            _currentTranslator = general.LastTranslator;
-    }
-
-    private void RefreshEngineList()
-    {
-        var translators = _translationService.AvailableTranslators.ToList();
-        if (translators.Count == 0)
-            translators.Add("百度翻译");
-
-        if (!translators.Contains(_currentTranslator))
-            _currentTranslator = translators[0];
-
-        _suppressEngineSync = true;
-        EngineCombo.ItemsSource = translators;
-        EngineCombo.SelectedItem = _currentTranslator;
-        _suppressEngineSync = false;
-
-        UpdateLanguageStatus();
-    }
-
-    private void OnEngineSelectionChanged(object? sender, SelectionChangedEventArgs e)
-    {
-        if (_suppressEngineSync)
-            return;
-
-        if (EngineCombo.SelectedItem is string name)
-        {
-            _currentTranslator = name;
-            UpdateLanguageStatus();
-        }
-    }
-
-    private async void OnTranslate(object? sender, RoutedEventArgs e) => await TranslateAsync();
-
-    private async Task TranslateAsync()
-    {
-        var text = InputText.Text?.Trim() ?? "";
-        if (string.IsNullOrEmpty(text))
-        {
-            SetStatus("请输入要翻译的文本", isWarning: true);
-            return;
-        }
-
-        _translateCts?.Cancel();
-        _translateCts = new CancellationTokenSource();
-        var token = _translateCts.Token;
-
-        TranslateButton.IsEnabled = false;
-        TranslateButton.Content = "翻译中...";
-        SetStatus("正在翻译，请稍候...");
-
-        try
-        {
-            var options = GetTranslationOptions();
-            var result = await _translationService.TranslateAsync(text, _currentTranslator, options, token);
-            if (token.IsCancellationRequested)
-                return;
-
-            if (result.Success)
-            {
-                OutputText.Text = result.TranslatedText;
-                var from = LanguageCatalog.GetDisplayName(options.FromCode);
-                var to = LanguageCatalog.GetDisplayName(options.ToCode);
-                SetStatus($"翻译完成 ({from} → {to})");
-                SaveLastTranslator();
-            }
-            else
-            {
-                OutputText.Text = $"翻译失败: {result.ErrorMessage}";
-                SetStatus("翻译失败", isError: true);
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            SetStatus("翻译已取消");
-        }
-        finally
-        {
-            TranslateButton.IsEnabled = true;
-            TranslateButton.Content = "翻译";
-        }
-    }
-
-    private void SaveLastTranslator()
-    {
-        var config = _configService.Current;
-        if (config.General.RememberLastTranslator)
-        {
-            config.General.LastTranslator = _currentTranslator;
-            _configService.Save();
-        }
-    }
-
-    private void OnClear(object? sender, RoutedEventArgs e)
-    {
-        InputText.Text = "";
-        OutputText.Text = "";
-        InputText.Focus();
-        SetStatus("内容已清空");
-    }
-
-    private async void OnCopy(object? sender, RoutedEventArgs e)
-    {
-        if (string.IsNullOrWhiteSpace(OutputText.Text))
-        {
-            SetStatus("没有可复制的翻译结果", isWarning: true);
-            return;
-        }
-
-        var clipboard = GetTopLevel(this)?.Clipboard;
-        if (clipboard is null)
-        {
-            SetStatus("无法访问剪贴板", isError: true);
-            return;
-        }
-
-        await clipboard.SetTextAsync(OutputText.Text);
-        SetStatus("翻译结果已复制到剪贴板");
-    }
-
-    private void OnSwap(object? sender, RoutedEventArgs e)
-    {
-        if (string.IsNullOrWhiteSpace(OutputText.Text))
-        {
-            SetStatus("没有可交换的翻译结果", isWarning: true);
-            return;
-        }
-
-        InputText.Text = OutputText.Text;
-        OutputText.Text = "";
-        OnSwapLanguages(sender, e);
-        InputText.Focus();
-        SetStatus("内容与语言方向已交换");
     }
 
     private async void OnSaveSettings(object? sender, RoutedEventArgs e)
     {
         var config = _configService.Current;
-        config.Baidu = new BaiduConfig
-        {
-            AppId = BaiduAppIdBox.Text?.Trim() ?? "",
-            SecretKey = BaiduSecretBox.Text ?? ""
-        };
         config.General.RunAtStartup = StartupService.IsSupported && RunAtStartupBox.IsChecked == true;
-        config.General.RememberLastTranslator = RememberTranslatorBox.IsChecked == true;
 
         if (!_configService.Save(config))
         {
@@ -484,25 +239,7 @@ public partial class MainWindow : Window
                 "警告");
         }
 
-        RefreshEngineList();
-
         SetStatus("设置已保存");
-    }
-
-    private async Task QuickTranslateFromClipboardAsync()
-    {
-        var text = await TryGetClipboardTextAsync();
-        if (string.IsNullOrEmpty(text))
-        {
-            _tray.ShowBalloon("熔岩翻译助手", "剪贴板中没有文本");
-            return;
-        }
-
-        ShowAndActivate();
-        SelectMainTab(1);
-        InputText.Text = text;
-        InputText.Focus();
-        await TranslateAsync();
     }
 
     private async void OnHotkeyPressed()
@@ -517,18 +254,8 @@ public partial class MainWindow : Window
         Show();
         WindowState = WindowState.Normal;
         Activate();
-
-        if (_mainTabIndex == 1)
-        {
-            InputText.Text = text;
-            InputText.Focus();
-            await TranslateAsync();
-        }
-        else
-        {
-            SelectMainTab(0);
-            await FillWebSiteAsync(text);
-        }
+        SelectMainTab(0);
+        await FillWebSiteAsync(text);
     }
 
     private async Task<string?> TryGetClipboardTextAsync()

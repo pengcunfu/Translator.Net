@@ -69,12 +69,6 @@ public sealed class ConfigService
         }
     }
 
-    public void UpdateBaidu(BaiduConfig baidu)
-    {
-        _config.Baidu = baidu;
-        Save();
-    }
-
     public void UpdateGeneral(GeneralConfig general)
     {
         _config.General = general;
@@ -85,15 +79,12 @@ public sealed class ConfigService
 
     private static AppConfig CreateDefault() => new()
     {
-        Baidu = new BaiduConfig(),
         General = new GeneralConfig()
     };
 
     private static AppConfig MergeWithDefaults(AppConfig loaded)
     {
         var defaults = CreateDefault();
-        if (string.IsNullOrWhiteSpace(loaded.Baidu.AppId))
-            loaded.Baidu ??= defaults.Baidu;
         loaded.General ??= defaults.General;
         return loaded;
     }
