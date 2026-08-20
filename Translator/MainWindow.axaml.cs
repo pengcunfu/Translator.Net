@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
@@ -26,6 +27,8 @@ public partial class MainWindow : Window
     private bool _suppressWebSiteSync;
     private bool _forceClose;
     private bool _webInitialized;
+    private bool _webReady;
+    private TaskCompletionSource<bool>? _webReadyTcs;
     private int _mainTabIndex;
 
     /// <summary>Design-time / XAML loader entry point.</summary>
@@ -91,7 +94,7 @@ public partial class MainWindow : Window
     public void AttachHotkey(IGlobalHotkey hotkey)
     {
         _hotkey = hotkey;
-        _hotkey.HotkeyPressed += (_, _) => Dispatcher.UIThread.Post(ToggleWindow);
+        _hotkey.HotkeyPressed += (_, _) => Dispatcher.UIThread.Post(OnHotkeyPressed);
     }
 
     public void InitializeTrayHandlers()
@@ -105,7 +108,7 @@ public partial class MainWindow : Window
     {
         _tray.ShowBalloon(
             "熔岩翻译助手",
-            "程序已启动 · 托盘图标打开窗口 · Alt+Space 显示/隐藏");
+            "程序已启动 · 托盘图标打开窗口 · Alt+Space 自动填入剪贴板内容 / 显示隐藏");
     }
 
     private void ApplyPlatformUi()
@@ -200,8 +203,17 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnWebNavigationStarted(object? sender, WebViewNavigationStartingEventArgs e)
+    {
+        _webReady = false;
+    }
+
     private void OnWebNavigationCompleted(object? sender, WebViewNavigationCompletedEventArgs e)
     {
+        _webReady = e.IsSuccess;
+        _webReadyTcs?.TrySetResult(e.IsSuccess);
+        _webReadyTcs = null;
+
         if (!e.IsSuccess)
         {
             SetStatus("网页加载失败，请检查网络或 WebView2 运行时", isError: true);
@@ -607,9 +619,7 @@ public partial class MainWindow : Window
 
     private async Task QuickTranslateFromClipboardAsync()
     {
-        var clipboard = GetTopLevel(this)?.Clipboard;
-        var text = clipboard is null ? null : await clipboard.TryGetTextAsync();
-        text = text?.Trim();
+        var text = await TryGetClipboardTextAsync();
         if (string.IsNullOrEmpty(text))
         {
             _tray.ShowBalloon("熔岩翻译助手", "剪贴板中没有文本");
@@ -621,6 +631,152 @@ public partial class MainWindow : Window
         InputText.Text = text;
         InputText.Focus();
         await TranslateAsync();
+    }
+
+    private async void OnHotkeyPressed()
+    {
+        var text = await TryGetClipboardTextAsync();
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            ToggleWindow();
+            return;
+        }
+
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
+
+        if (_mainTabIndex == 1)
+        {
+            InputText.Text = text;
+            InputText.Focus();
+            await TranslateAsync();
+        }
+        else
+        {
+            SelectMainTab(0);
+            await FillWebSiteAsync(text);
+        }
+    }
+
+    private async Task<string?> TryGetClipboardTextAsync()
+    {
+        var clipboard = GetTopLevel(this)?.Clipboard;
+        if (clipboard is null)
+            return null;
+
+        try
+        {
+            var text = await clipboard.TryGetTextAsync();
+            return text?.Trim();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private async Task FillWebSiteAsync(string text)
+    {
+        if (CurrentWebSite is not { } site)
+        {
+            SetStatus("未选择网页翻译站点", isWarning: true);
+            return;
+        }
+
+        if (!_webReady || WebView.Source is not { } source || !SamePage(source, site.HomeUrl))
+        {
+            SetStatus($"正在打开 {site.Name}…");
+            WebView.Source = site.HomeUrl;
+            _webInitialized = true;
+            if (!await WaitWebReadyAsync(TimeSpan.FromSeconds(25)))
+            {
+                SetStatus("网页加载超时，请稍后重试", isWarning: true);
+                return;
+            }
+        }
+
+        // 部分站点为 SPA，页面看似加载完成但输入框尚未渲染，重试几次
+        Exception? lastError = null;
+        for (var attempt = 0; attempt < 4; attempt++)
+        {
+            try
+            {
+                var resultJson = await WebView.InvokeScript(WebFillAutomation.BuildFillScript(site.Id, text));
+                if (TryParseFillResult(resultJson, out var ok, out var detail))
+                {
+                    if (ok)
+                    {
+                        SetStatus($"已把剪贴板内容填入 {site.Name}");
+                        return;
+                    }
+
+                    lastError = new InvalidOperationException(detail);
+                }
+            }
+            catch (Exception ex)
+            {
+                lastError = ex;
+                break;
+            }
+
+            await Task.Delay(400);
+        }
+
+        SetStatus(
+            $"未能自动填入 {site.Name}（{lastError?.Message ?? "未知原因"}），可手动 Ctrl+V 粘贴",
+            isWarning: true);
+    }
+
+    private static bool TryParseFillResult(string? json, out bool ok, out string detail)
+    {
+        ok = false;
+        detail = "未知原因";
+        if (string.IsNullOrWhiteSpace(json))
+            return false;
+
+        try
+        {
+            // 个别平台可能对返回值再做一次 JSON 编码，先尝试解开
+            if (json.Length >= 2 && json[0] == '"' && json[^1] == '"')
+                json = JsonSerializer.Deserialize<string>(json) ?? json;
+
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.TryGetProperty("ok", out var okEl) && okEl.ValueKind == JsonValueKind.True)
+                ok = true;
+            if (doc.RootElement.TryGetProperty("detail", out var detailEl))
+                detail = detailEl.GetString() ?? detail;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool SamePage(Uri a, Uri b) =>
+        string.Equals(a.Scheme, b.Scheme, StringComparison.OrdinalIgnoreCase)
+        && string.Equals(a.Host, b.Host, StringComparison.OrdinalIgnoreCase)
+        && a.Port == b.Port
+        && string.Equals(a.AbsolutePath, b.AbsolutePath, StringComparison.OrdinalIgnoreCase);
+
+    private async Task<bool> WaitWebReadyAsync(TimeSpan timeout)
+    {
+        if (_webReady)
+            return true;
+
+        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _webReadyTcs = tcs;
+
+        // 赋值后再次检查，避免导航在赋值前已完成导致一直等待
+        if (_webReady)
+        {
+            _webReadyTcs = null;
+            return true;
+        }
+
+        var winner = await Task.WhenAny(tcs.Task, Task.Delay(timeout));
+        return ReferenceEquals(winner, tcs.Task) && tcs.Task.Result;
     }
 
     public void ShowAndActivate()

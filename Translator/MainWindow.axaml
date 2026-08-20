@@ -68,6 +68,7 @@
         <!-- 网页 -->
         <Border x:Name="WebPage" Classes="panel" Padding="0" ClipToBounds="True">
           <NativeWebView x:Name="WebView"
+                         NavigationStarted="OnWebNavigationStarted"
                          NavigationCompleted="OnWebNavigationCompleted"/>
         </Border>
 
@@ -184,7 +185,7 @@
                              Text="开机自启仅在 Windows 上可用。"/>
                   <CheckBox x:Name="RememberTranslatorBox" Content="记住上次使用的翻译引擎"/>
                   <TextBlock x:Name="HotkeyHint" Classes="muted" Margin="0,4,0,0"
-                             Text="全局快捷键：Alt+Space（显示 / 隐藏窗口）"/>
+                             Text="全局快捷键：Alt+Space（剪贴板有内容时自动填入当前翻译平台，否则显示 / 隐藏）"/>
                 </StackPanel>
               </Border>
             </TabItem>
@@ -207,7 +208,7 @@
             <TextBlock Text="v1.0.0" Classes="muted" Margin="0,0,0,16"/>
             <TextBlock Text="基于 .NET 10 + Avalonia" Margin="0,0,0,6"/>
             <TextBlock Text="支持百度翻译 API、OpenAI 兼容 AI 翻译，以及网页内嵌翻译站" Margin="0,0,0,16"/>
-            <TextBlock Classes="muted" Text="快捷键：Alt+Space（Windows，显示 / 隐藏窗口）"/>
+            <TextBlock Classes="muted" Text="快捷键：Alt+Space（Windows，剪贴板有内容时自动填入当前翻译平台）"/>
             <TextBlock Classes="muted" Margin="0,6,0,0"
                        Text="网页翻译内嵌有道、搜狗、百度、谷歌、DeepL 等站点（Windows 需 WebView2）"/>
             <TextBlock Classes="muted" Margin="0,6,0,0"

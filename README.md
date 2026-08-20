@@ -6,9 +6,9 @@
 
 - **百度翻译**：通过 [百度翻译开放平台](https://fanyi-api.baidu.com/) 的 App ID 与密钥调用官方 API
 - **AI 翻译**：支持任意 **OpenAI 兼容** 接口（可配置多个），例如 OpenAI、DeepSeek、智谱 GLM、Ollama 等
-- 系统托盘、全局快捷键 **Alt+Space**（Windows：显示/隐藏窗口）
+- 系统托盘、全局快捷键 **Alt+Space**（Windows：剪贴板有内容时自动填入当前翻译平台，否则显示/隐藏窗口）
 - **开机自启动**（Windows）：在设置中开启后，登录时自动在托盘运行（不弹出主窗口）
-- 剪贴板快速翻译、原文/译文交换、复制结果
+- 剪贴板快速翻译（托盘菜单）、按快捷键自动把剪贴板内容填入当前翻译平台（原生翻译页 + 内嵌网页：有道、搜狗、百度、必应、谷歌、DeepL、腾讯）、原文/译文交换、复制结果
 - **网页翻译**：内嵌 WebView 打开有道、搜狗、百度、谷歌、DeepL、必应、腾讯等翻译站（Windows 需 [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/)）
 
 ## 运行
