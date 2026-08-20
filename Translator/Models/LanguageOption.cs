@@ -43,14 +43,6 @@ public static class LanguageCatalog
     public static string GetDisplayName(string code) =>
         FindByCode(code)?.DisplayName ?? code;
 
-    /// <summary>供 AI 翻译使用的自然语言名称</summary>
-    public static string GetAiLanguageName(string code)
-    {
-        if (code.Equals("auto", StringComparison.OrdinalIgnoreCase))
-            return "自动识别";
-        return GetDisplayName(code);
-    }
-
     public static string DetectFromText(string text)
     {
         foreach (var c in text)

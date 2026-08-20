@@ -75,15 +75,5 @@ public sealed class TranslationService
         var config = _configService.Current;
 
         _translators["百度翻译"] = new BaiduTranslator(config.Baidu);
-
-        foreach (var provider in config.OpenAiProviders.Where(p =>
-            p.Enabled && !string.IsNullOrWhiteSpace(p.Name) && !string.IsNullOrWhiteSpace(p.ApiKey)))
-        {
-            var name = provider.Name.Trim();
-            if (_translators.ContainsKey(name))
-                name = $"{name} ({provider.Id[..6]})";
-
-            _translators[name] = new OpenAiTranslator(provider);
-        }
     }
 }

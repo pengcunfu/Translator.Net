@@ -5,7 +5,6 @@
 ## 功能
 
 - **百度翻译**：通过 [百度翻译开放平台](https://fanyi-api.baidu.com/) 的 App ID 与密钥调用官方 API
-- **AI 翻译**：支持任意 **OpenAI 兼容** 接口（可配置多个），例如 OpenAI、DeepSeek、智谱 GLM、Ollama 等
 - 系统托盘、全局快捷键 **Alt+Space**（Windows：剪贴板有内容时自动填入当前翻译平台，否则显示/隐藏窗口）
 - **开机自启动**（Windows）：在设置中开启后，登录时自动在托盘运行（不弹出主窗口）
 - 剪贴板快速翻译（托盘菜单）、按快捷键自动把剪贴板内容填入当前翻译平台（原生翻译页 + 内嵌网页：有道、搜狗、百度、必应、谷歌、DeepL、腾讯）、原文/译文交换、复制结果
@@ -37,20 +36,6 @@ dotnet publish Translator/LavaTranslator.csproj -c Release -r win-x64 --self-con
 ### 百度翻译
 
 在 **设置 → 百度翻译** 中填写 App ID 与 Secret Key。
-
-### AI 翻译（多个）
-
-在 **设置 → AI 翻译** 中可添加多条配置，每条包含：
-
-| 字段 | 说明 |
-|------|------|
-| 显示名称 | 引擎列表中显示的名称 |
-| API Key | 接口密钥 |
-| Base URL | 兼容端点根地址（如 `https://api.openai.com/v1/`） |
-| 模型 | 如 `gpt-4o-mini`、`glm-4-flash`、`deepseek-chat` |
-| Temperature / Max Tokens | 生成参数 |
-
-从旧版 Python 配置迁移：若存在 `glm` 节点且未配置新的 `openAiProviders`，首次启动会自动迁移为一条「GLM翻译」配置。
 
 ## 项目结构
 

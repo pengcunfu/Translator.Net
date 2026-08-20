@@ -134,49 +134,6 @@
               </Border>
             </TabItem>
 
-            <TabItem Header="AI 翻译">
-              <DockPanel Margin="0,10,0,0">
-                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="0,0,0,8">
-                  <Button Content="添加" Click="OnAddProvider" Classes="secondary"/>
-                  <Button Content="删除" Click="OnRemoveProvider" Classes="ghost"/>
-                  <Button Content="复制" Click="OnDuplicateProvider" Classes="ghost"/>
-                </StackPanel>
-                <Grid ColumnDefinitions="150,10,*">
-                  <ListBox x:Name="ProvidersList" Grid.Column="0"
-                           DisplayMemberBinding="{Binding Name}"
-                           SelectionChanged="OnProviderSelectionChanged"/>
-                  <Border Grid.Column="2" Classes="panel" Padding="12">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                      <StackPanel x:Name="ProviderEditor" IsEnabled="False">
-                        <CheckBox x:Name="ProviderEnabledBox" Content="启用此配置（出现在翻译引擎列表）"
-                                  IsChecked="True"/>
-                        <TextBlock Text="显示名称" Classes="field"/>
-                        <TextBox x:Name="ProviderNameBox" Margin="0,0,0,10"/>
-                        <TextBlock Text="API Key" Classes="field"/>
-                        <TextBox x:Name="ProviderApiKeyBox" PasswordChar="•" Margin="0,0,0,10"/>
-                        <TextBlock Text="Base URL" Classes="field"/>
-                        <TextBox x:Name="ProviderBaseUrlBox" Margin="0,0,0,10"/>
-                        <TextBlock Text="模型" Classes="field"/>
-                        <TextBox x:Name="ProviderModelBox" Margin="0,0,0,10"/>
-                        <Grid Margin="0,0,0,10" ColumnDefinitions="*,10,*">
-                          <StackPanel Grid.Column="0">
-                            <TextBlock Text="Temperature" Classes="field"/>
-                            <TextBox x:Name="ProviderTemperatureBox"/>
-                          </StackPanel>
-                          <StackPanel Grid.Column="2">
-                            <TextBlock Text="Max Tokens" Classes="field"/>
-                            <TextBox x:Name="ProviderMaxTokensBox"/>
-                          </StackPanel>
-                        </Grid>
-                        <TextBlock Classes="muted" TextWrapping="Wrap"
-                                   Text="兼容 OpenAI 协议（OpenAI、DeepSeek、智谱、Ollama 等）。Base URL 填端点根路径；仅域名时自动补 /v1/。"/>
-                      </StackPanel>
-                    </ScrollViewer>
-                  </Border>
-                </Grid>
-              </DockPanel>
-            </TabItem>
-
             <TabItem Header="通用">
               <Border Classes="panel" Margin="0,10,0,0" Padding="14">
                 <StackPanel>
@@ -207,7 +164,7 @@
             <TextBlock Text="熔岩翻译助手" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,4"/>
             <TextBlock Text="v1.0.0" Classes="muted" Margin="0,0,0,16"/>
             <TextBlock Text="基于 .NET 10 + Avalonia" Margin="0,0,0,6"/>
-            <TextBlock Text="支持百度翻译 API、OpenAI 兼容 AI 翻译，以及网页内嵌翻译站" Margin="0,0,0,16"/>
+            <TextBlock Text="支持百度翻译 API，以及网页内嵌翻译站" Margin="0,0,0,16"/>
             <TextBlock Classes="muted" Text="快捷键：Alt+Space（Windows，剪贴板有内容时自动填入当前翻译平台）"/>
             <TextBlock Classes="muted" Margin="0,6,0,0"
                        Text="网页翻译内嵌有道、搜狗、百度、谷歌、DeepL 等站点（Windows 需 WebView2）"/>
